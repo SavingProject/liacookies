@@ -1,0 +1,6 @@
+{
+  "name": "Monte Pork",
+  "description": "Menú digital interactivo y crujiente de Monte Pork",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,47 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Outfit', sans-serif;
+  --font-display: 'Space Grotesk', sans-serif;
+  --color-primary: var(--primary-color, #E8005A);
+  --color-primary-dark: var(--primary-dark-color, #C20042);
+  --color-dark-bg: var(--bg-color, #0A0A0B);
+  --color-dark-card: var(--card-color, #141416);
+  --color-wine: #5F021B;
+  --color-gold: var(--accent-color, #FFB800);
+}
+
+@layer base {
+  body {
+    background-color: var(--color-dark-bg);
+    color: #F3F4F6;
+    font-family: var(--font-sans);
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Custom styles for animations & custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-color, #0A0A0B);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--primary-color, #E8005A);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-dark-color, #C20042);
+}
+
+/* Custom shine effects & pulsing text */
+.text-pulse-glow {
+  text-shadow: 0 0 10px var(--primary-color, rgba(232, 0, 90, 0.4));
+}
+
+.logo-pig-nose-glow {
+  filter: drop-shadow(0 0 8px var(--primary-color, rgba(232, 0, 90, 0.6)));
+}
