@@ -3,9 +3,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useRef, FormEvent } from "react";
+import { useState, useEffect, useRef, FormEvent, ChangeEvent } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { CATEGORIES, MENU_ITEMS } from "./data";
+import {
+  CATEGORIES,
+  MENU_ITEMS,
+  BANK_ACCOUNTS,
+  RNC_HEADER,
+  CONTACT_INFO,
+  STORE_SETTINGS,
+  ADMIN_PASSWORD_HASH
+} from "./data";
 import { MenuItem, MenuCategory, CartItem } from "./types";
 import Logo from "./components/Logo";
 import MenuItemCard from "./components/MenuItemCard";
@@ -46,7 +54,11 @@ import {
   Layers,
   Sparkle,
   Paintbrush,
-  Globe
+  Globe,
+  Download,
+  Upload,
+  FileJson,
+  Copy
 } from "lucide-react";
 
 const COLOR_PRESETS = [
@@ -180,6 +192,7 @@ export default function App() {
   // Modals
   const [showChangePassModal, setShowChangePassModal] = useState(false);
   const [showBrandingModal, setShowBrandingModal] = useState(false);
+  const [showBackupModal, setShowBackupModal] = useState(false);
   const [currentPassInput, setCurrentPassInput] = useState("");
   const [newPassInput, setNewPassInput] = useState("");
   const [confirmPassInput, setConfirmPassInput] = useState("");
@@ -198,106 +211,33 @@ export default function App() {
     return saved ? JSON.parse(saved) : MENU_ITEMS;
   });
 
-  const [bankAccounts, setBankAccounts] = useState(() => {
+  const [bankAccounts, setBankAccounts] = useState<BankAccountItem[]>(() => {
     const saved = localStorage.getItem("montepork_bank_accounts");
-    const defaultAccounts = [
-      {
-        id: "rnc",
-        bank: "RP2, SRL",
-        type: "RNC (Registro Nacional de Contribuyentes)",
-        number: "133410389",
-        accent: "border-primary/20 bg-primary/5",
-        logoType: "rnc"
-      },
-      {
-        id: "bhd",
-        bank: "Banco BHD",
-        type: "Cuenta de Ahorros",
-        number: "39729570017",
-        accent: "border-emerald-500/20 bg-emerald-500/5",
-        logoType: "bhd"
-      },
-      {
-        id: "banreservas",
-        bank: "Banreservas",
-        type: "Cuenta de Ahorros",
-        number: "9609051377",
-        accent: "border-sky-500/20 bg-sky-500/5",
-        logoType: "banreservas"
-      }
-    ];
-    return saved ? JSON.parse(saved) : defaultAccounts;
+    return saved ? JSON.parse(saved) : BANK_ACCOUNTS;
   });
 
   const [rncHeader, setRncHeader] = useState(() => {
-    return localStorage.getItem("montepork_rnc_header") || "RNC: 133-41038-9";
+    return localStorage.getItem("montepork_rnc_header") || RNC_HEADER;
   });
 
   const [contactInfo, setContactInfo] = useState(() => {
     const saved = localStorage.getItem("montepork_contact_info");
-    return saved ? JSON.parse(saved) : { phone: "18498140019", instagram: "monteporkrd" };
+    return saved ? JSON.parse(saved) : CONTACT_INFO;
   });
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const [storeSettings, setStoreSettings] = useState(() => {
     const saved = localStorage.getItem("montepork_store_settings");
-    const defaultSettings = {
-      heroTitle: "MONTE PORK",
-      heroSubtitle: "El Más Crujiente de la Región",
-      heroDescription: "Chicharrón de verdad, macerado por 24 horas y explotado al momento. Mofongos, combos del coro y las cervezas más frías de la comarca.",
-      heroButton1Text: "Ver Menú",
-      heroButton2Text: "Escríbenos",
-      titleDisplayType: "text" as "text" | "image",
-      titleImageUrl: "",
-      titleImageWidth: 320,
-      specialtyBadge: "La Gloria en Pilón",
-      specialtyTitle: "Nuestra Especialidad:",
-      specialtyTitleHighlight: "Mofongo MP",
-      specialtyDescription: "Majo de plátano verde o maduro y yuca con abundante ajo confitado tradicional, frito con tropezones de chicharrón crujientito. Coronado con su capa de queso fundido burbujeante y servido con porción de tocino, longaniza artesanal o más chicharrón.",
-      specialtyPriceLabel: "Precio",
-      specialtyPriceValue: "RD$ 400",
-      specialtyFlavorLabel: "Sabor",
-      specialtyFlavorValue: "100% Criollo 🇩🇴",
-      specialtyButtonText: "Agregar al plato",
-      specialtyImage: "",
-      specialtyPhotoBadge: "Foto real de cocina",
-      specialtyPhotoCaption: "El Mofongo MP recién salido del pilón",
-      paymentBadge: "Soporte de pagos",
-      paymentTitle: "Información de Transferencia",
-      paymentDescription: "Pide en línea y transfiere de manera fácil. Copia los datos con un solo toque y envía tu captura por WhatsApp.",
-      footerDescription: "Sazón monteplatense tradicional con crujido urbano. Sigue nuestro chicharrón en nuestras redes. ¡Buen provecho!",
-      footerCopyright: "© 2026 MONTE PORK. Todos los derechos reservados.",
-      footerDisclaimer: "IMPUESTOS NO INCLUIDOS",
-      activeStatusLabel: "Activos en el horno 🇩🇴",
-      primaryColor: "#E8005A",
-      primaryDarkColor: "#C20042",
-      accentColor: "#FFB800",
-      backgroundColor: "#0A0A0B",
-      cardColor: "#141416",
-      logoType: "snout",
-      logoValue: "",
-      tabTitle: "MONTE PORK | El Más Crujiente de la Región",
-      menuTagline: "El Más Crujiente",
-      backgroundType: "image" as "image" | "solid" | "gradient",
-      backgroundImageUrl: "",
-      backgroundSolidColor: "#0A0A0B",
-      backgroundGradientPreset: "fucsia_noir",
-      backgroundGradientColor1: "#2B0017",
-      backgroundGradientColor2: "#0A0A0B",
-      backgroundGradientDirection: "to bottom",
-    };
-    
-    // Ensure all default keys exist in parsed settings
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        return { ...defaultSettings, ...parsed };
+        return { ...STORE_SETTINGS, ...parsed };
       } catch (e) {
-        return defaultSettings;
+        return STORE_SETTINGS;
       }
     }
-    return defaultSettings;
+    return STORE_SETTINGS;
   });
 
   const handleUpdateSetting = (key: string, value: any) => {
@@ -371,7 +311,7 @@ export default function App() {
 
   // Server-saved SHA-256 password hash (default is "1234")
   const [adminPasswordHash, setAdminPasswordHash] = useState(() => {
-    return localStorage.getItem("montepork_admin_pwd_hash") || "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4";
+    return localStorage.getItem("montepork_admin_pwd_hash") || ADMIN_PASSWORD_HASH;
   });
 
   // Load configuration from local server disk
@@ -592,6 +532,59 @@ export default function App() {
       setHasUnsavedChanges(false);
       showToast("💾 Cambios guardados con éxito.");
     }
+  };
+
+  // Export full store configuration as JSON file download
+  const handleExportBackup = () => {
+    const configData = {
+      categories,
+      menuItems,
+      bankAccounts,
+      rncHeader,
+      contactInfo,
+      storeSettings,
+      adminPasswordHash
+    };
+    const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
+      JSON.stringify(configData, null, 2)
+    )}`;
+    const downloadAnchor = document.createElement("a");
+    downloadAnchor.setAttribute("href", jsonString);
+    downloadAnchor.setAttribute("download", "store_config.json");
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    showToast("📥 Archivo store_config.json descargado con éxito.");
+  };
+
+  // Import configuration from JSON file
+  const handleImportBackup = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const fileReader = new FileReader();
+    fileReader.onload = (event) => {
+      try {
+        const result = event.target?.result as string;
+        const parsed = JSON.parse(result);
+        if (parsed) {
+          if (parsed.categories) setCategories(parsed.categories);
+          if (parsed.menuItems) setMenuItems(parsed.menuItems);
+          if (parsed.bankAccounts) setBankAccounts(parsed.bankAccounts);
+          if (parsed.rncHeader) setRncHeader(parsed.rncHeader);
+          if (parsed.contactInfo) setContactInfo(parsed.contactInfo);
+          if (parsed.storeSettings) setStoreSettings((prev: any) => ({ ...prev, ...parsed.storeSettings }));
+          if (parsed.adminPasswordHash) setAdminPasswordHash(parsed.adminPasswordHash);
+
+          setHasUnsavedChanges(true);
+          showToast("📂 ¡Configuración importada! Haz clic en 'Guardar Configuración' para fijarla.");
+          setShowBackupModal(false);
+        }
+      } catch (err) {
+        showToast("⚠️ El archivo seleccionado no es un JSON válido.");
+      }
+    };
+    fileReader.readAsText(file);
   };
 
   // Asset paths from generated assets
@@ -949,6 +942,14 @@ export default function App() {
             >
               <Palette className="w-3.5 h-3.5 text-primary animate-pulse" style={{ color: "var(--color-primary)" }} />
               <span>Diseño y Colores</span>
+            </button>
+
+            <button
+              onClick={() => setShowBackupModal(true)}
+              className="px-3 py-1.5 bg-white/5 border border-white/10 hover:bg-white/10 text-gray-300 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <FileJson className="w-3.5 h-3.5 text-amber-400" />
+              <span>Backup / JSON</span>
             </button>
 
             <button
@@ -1632,6 +1633,103 @@ export default function App() {
               >
                 <Check className="w-4 h-4" />
                 <span>Aplicar y Cerrar</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Backup and JSON Configuration Modal */}
+      {showBackupModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md overflow-y-auto">
+          <div className="bg-dark-card border border-white/10 p-6 md:p-8 rounded-3xl w-full max-w-lg space-y-6 shadow-2xl relative my-8 font-sans">
+            <button
+              onClick={() => setShowBackupModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="text-center space-y-2">
+              <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 mx-auto border border-amber-500/35">
+                <FileJson className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-display font-black text-white">
+                Copia de Seguridad y Configuración JSON 📁
+              </h3>
+              <p className="text-xs text-gray-400 font-light leading-relaxed">
+                Descarga una copia completa de todos tus platos, categorías, precios y colores en un archivo <code className="text-amber-400 font-mono">store_config.json</code> o cárgalo para restaurarlo al instante en cualquier navegador o despliegue.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {/* Export Button */}
+              <div className="bg-black/40 border border-white/10 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <Download className="w-4 h-4 text-emerald-400" />
+                      <span>Descargar Copia JSON</span>
+                    </h4>
+                    <p className="text-[11px] text-gray-400">
+                      Guarda el archivo <code className="text-emerald-300">store_config.json</code> con tus cambios actuales.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleExportBackup}
+                    className="px-3.5 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-300 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md shrink-0"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Descargar</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Import Button */}
+              <div className="bg-black/40 border border-white/10 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <Upload className="w-4 h-4 text-sky-400" />
+                      <span>Restaurar / Importar Archivo JSON</span>
+                    </h4>
+                    <p className="text-[11px] text-gray-400">
+                      Sube un archivo de configuración previamente descargado.
+                    </p>
+                  </div>
+                  <label className="px-3.5 py-2 bg-sky-500/20 hover:bg-sky-500/30 border border-sky-500/30 text-sky-300 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md shrink-0">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Cargar JSON</span>
+                    <input
+                      type="file"
+                      accept=".json,application/json"
+                      onChange={handleImportBackup}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Information Note */}
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3.5 text-xs text-amber-200/90 space-y-1">
+                <div className="flex items-center gap-1.5 font-bold text-amber-300">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>Persistencia en Vercel & Producción:</span>
+                </div>
+                <p className="text-[11px] leading-relaxed text-gray-300 font-light">
+                  Cada vez que guardas tus cambios en este panel, el servidor actualiza automáticamente los archivos <code className="text-amber-300 font-mono text-[10px]">src/store_config.json</code> y <code className="text-amber-300 font-mono text-[10px]">data/store_config.json</code> en disco. Al compilar o subir el código a Vercel, todos tus platos, datos bancarios y personalizaciones quedan grabados permanentemente.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setShowBackupModal(false)}
+                className="w-full py-3 bg-white/10 hover:bg-white/15 border border-white/10 rounded-xl text-xs font-bold text-white uppercase tracking-wide cursor-pointer transition-all"
+              >
+                Cerrar
               </button>
             </div>
           </div>

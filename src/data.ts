@@ -1,6 +1,7 @@
 import { MenuItem, MenuCategory } from "./types";
+import storeConfig from "./store_config.json";
 
-export const CATEGORIES: MenuCategory[] = [
+export const CATEGORIES: MenuCategory[] = (storeConfig?.categories as MenuCategory[]) || [
   { id: "entradas", name: "Entrando Crujiente", tagline: "Entradas caribeñas y bien crujientes para empezar el mambo" },
   { id: "tajos", name: "Los Tajo's Solos", tagline: "Los mejores cortes sazonados por 24 hrs y fritos a la perfección" },
   { id: "fuertes", name: "Pa' los Fuertes", tagline: "Platos contundentes para quedar con la barriga llena y el corazón contento" },
@@ -10,7 +11,7 @@ export const CATEGORIES: MenuCategory[] = [
   { id: "bebidas", name: "Bebidas", tagline: "Refrescos fríos, tragos de autor y las cervezas más frías de la región" }
 ];
 
-export const MENU_ITEMS: MenuItem[] = [
+export const MENU_ITEMS: MenuItem[] = (storeConfig?.menuItems as MenuItem[]) || [
   // 1. ENTRADAS
   {
     id: "papa_suprema",
@@ -212,3 +213,85 @@ export const MENU_ITEMS: MenuItem[] = [
   { id: "c_galicia", name: "Estrella Galicia", price: 180, subCategory: "bebidas", description: "Cervezas Extra Frías" },
   { id: "c_heineken", name: "Heineken", price: 200, subCategory: "bebidas", description: "Cervezas Extra Frías" }
 ];
+
+export const BANK_ACCOUNTS = storeConfig?.bankAccounts || [
+  {
+    id: "rnc",
+    bank: "RP2, SRL",
+    type: "RNC (Registro Nacional de Contribuyentes)",
+    number: "133410389",
+    accent: "border-primary/20 bg-primary/5",
+    logoType: "rnc"
+  },
+  {
+    id: "bhd",
+    bank: "Banco BHD",
+    type: "Cuenta de Ahorros",
+    number: "39729570017",
+    accent: "border-emerald-500/20 bg-emerald-500/5",
+    logoType: "bhd"
+  },
+  {
+    id: "banreservas",
+    bank: "Banreservas",
+    type: "Cuenta de Ahorros",
+    number: "9609051377",
+    accent: "border-sky-500/20 bg-sky-500/5",
+    logoType: "banreservas"
+  }
+];
+
+export const RNC_HEADER = storeConfig?.rncHeader || "RNC: 133-41038-9";
+
+export const CONTACT_INFO = storeConfig?.contactInfo || {
+  phone: "18498140019",
+  instagram: "monteporkrd"
+};
+
+export const STORE_SETTINGS = storeConfig?.storeSettings || {
+  heroTitle: "MONTE PORK",
+  heroSubtitle: "El Más Crujiente de la Región",
+  heroDescription: "Chicharrón de verdad, macerado por 24 horas y explotado al momento. Mofongos, combos del coro y las cervezas más frías de la comarca.",
+  heroButton1Text: "Ver Menú",
+  heroButton2Text: "Escríbenos",
+  titleDisplayType: "text",
+  titleImageUrl: "",
+  titleImageWidth: 320,
+  specialtyBadge: "La Gloria en Pilón",
+  specialtyTitle: "Nuestra Especialidad:",
+  specialtyTitleHighlight: "Mofongo MP",
+  specialtyDescription: "Majo de plátano verde o maduro y yuca con abundante ajo confitado tradicional, frito con tropezones de chicharrón crujientito. Coronado con su capa de queso fundido burbujeante y servido con porción de tocino, longaniza artesanal o más chicharrón.",
+  specialtyPriceLabel: "Precio",
+  specialtyPriceValue: "RD$ 400",
+  specialtyFlavorLabel: "Sabor",
+  specialtyFlavorValue: "100% Criollo 🇩🇴",
+  specialtyButtonText: "Agregar al plato",
+  specialtyImage: "",
+  specialtyPhotoBadge: "Foto real de cocina",
+  specialtyPhotoCaption: "El Mofongo MP recién salido del pilón",
+  paymentBadge: "Soporte de pagos",
+  paymentTitle: "Información de Transferencia",
+  paymentDescription: "Pide en línea y transfiere de manera fácil. Copia los datos con un solo toque y envía tu captura por WhatsApp.",
+  footerDescription: "Sazón monteplatense tradicional con crujido urbano. Sigue nuestro chicharrón en nuestras redes. ¡Buen provecho!",
+  footerCopyright: "© 2026 MONTE PORK. Todos los derechos reservados.",
+  footerDisclaimer: "",
+  activeStatusLabel: "Activos en el horno 🇩🇴",
+  primaryColor: "#E8005A",
+  primaryDarkColor: "#C20042",
+  accentColor: "#FFB800",
+  backgroundColor: "#0A0A0B",
+  cardColor: "#141416",
+  logoType: "snout",
+  logoValue: "",
+  tabTitle: "MONTE PORK | El Más Crujiente de la Región",
+  menuTagline: "El Más Crujiente",
+  backgroundType: "image",
+  backgroundImageUrl: "",
+  backgroundSolidColor: "#0A0A0B",
+  backgroundGradientPreset: "fucsia_noir",
+  backgroundGradientColor1: "#2B0017",
+  backgroundGradientColor2: "#0A0A0B",
+  backgroundGradientDirection: "to bottom"
+};
+
+export const ADMIN_PASSWORD_HASH = storeConfig?.adminPasswordHash || "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4";

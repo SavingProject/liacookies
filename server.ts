@@ -15,24 +15,32 @@ async function startServer() {
   // Body parser to support large payloads for potential image bases or big menu listings
   app.use(express.json({ limit: "50mb" }));
 
-  // File path for disk storage
+  // File paths for disk storage
+  const SRC_CONFIG_FILE = path.join(process.cwd(), "src", "store_config.json");
   const DATA_DIR = path.join(process.cwd(), "data");
-  const CONFIG_FILE = path.join(DATA_DIR, "store_config.json");
+  const DATA_CONFIG_FILE = path.join(DATA_DIR, "store_config.json");
 
   // Ensure data directory exists
   if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+    try {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    } catch (e) {
+      console.warn("Could not create data dir (read-only environment):", e);
+    }
   }
 
   // Get current configuration
   app.get("/api/config", (req, res) => {
     try {
-      if (fs.existsSync(CONFIG_FILE)) {
-        const fileContent = fs.readFileSync(CONFIG_FILE, "utf-8");
+      if (fs.existsSync(SRC_CONFIG_FILE)) {
+        const fileContent = fs.readFileSync(SRC_CONFIG_FILE, "utf-8");
+        const parsed = JSON.parse(fileContent);
+        return res.json({ found: true, ...parsed });
+      } else if (fs.existsSync(DATA_CONFIG_FILE)) {
+        const fileContent = fs.readFileSync(DATA_CONFIG_FILE, "utf-8");
         const parsed = JSON.parse(fileContent);
         return res.json({ found: true, ...parsed });
       } else {
-        // Return indicating no disk configuration exists yet
         return res.json({ found: false });
       }
     } catch (error) {
@@ -41,12 +49,30 @@ async function startServer() {
     }
   });
 
-  // Save current configuration
+  // Save current configuration to disk files
   app.post("/api/config", (req, res) => {
     try {
       const data = req.body;
-      fs.writeFileSync(CONFIG_FILE, JSON.stringify(data, null, 2), "utf-8");
-      res.json({ success: true, message: "Configuration saved to disk." });
+      const jsonString = JSON.stringify(data, null, 2);
+
+      // Save directly into src/ for static Vercel build and git persistence
+      try {
+        fs.writeFileSync(SRC_CONFIG_FILE, jsonString, "utf-8");
+      } catch (err) {
+        console.warn("Warning writing to SRC_CONFIG_FILE:", err);
+      }
+
+      // Save into data/ directory as backup
+      try {
+        if (!fs.existsSync(DATA_DIR)) {
+          fs.mkdirSync(DATA_DIR, { recursive: true });
+        }
+        fs.writeFileSync(DATA_CONFIG_FILE, jsonString, "utf-8");
+      } catch (err) {
+        console.warn("Warning writing to DATA_CONFIG_FILE:", err);
+      }
+
+      res.json({ success: true, message: "Configuration successfully saved to disk." });
     } catch (error) {
       console.error("Error writing config to disk:", error);
       res.status(500).json({ error: "Failed to save configuration." });
