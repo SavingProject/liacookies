@@ -58,10 +58,32 @@ import {
   Download,
   Upload,
   FileJson,
-  Copy
+  Copy,
+  Eye,
+  EyeOff,
+  HardDrive,
+  RefreshCw,
+  History,
+  CheckCircle2
 } from "lucide-react";
 
 const COLOR_PRESETS = [
+  {
+    name: "Lia Cookies (Morado Dulce)",
+    primaryColor: "#8A1C9E",
+    primaryDarkColor: "#5A0C6B",
+    accentColor: "#FF2A85",
+    backgroundColor: "#14031E",
+    cardColor: "#230A33"
+  },
+  {
+    name: "Pastel Bakery (Lila & Rosa)",
+    primaryColor: "#9333EA",
+    primaryDarkColor: "#7E22CE",
+    accentColor: "#EC4899",
+    backgroundColor: "#19082B",
+    cardColor: "#2A0E44"
+  },
   {
     name: "Fuego Fucsia (Original)",
     primaryColor: "#E8005A",
@@ -71,7 +93,7 @@ const COLOR_PRESETS = [
     cardColor: "#141416"
   },
   {
-    name: "Oro Negro (Elegante)",
+    name: "Oro Dulce (Caramelo)",
     primaryColor: "#D4AF37",
     primaryDarkColor: "#AA820A",
     accentColor: "#F59E0B",
@@ -79,7 +101,7 @@ const COLOR_PRESETS = [
     cardColor: "#161619"
   },
   {
-    name: "Brasa Roja (Barbacoa)",
+    name: "Fresa & Chocolate",
     primaryColor: "#EF4444",
     primaryDarkColor: "#DC2626",
     accentColor: "#F97316",
@@ -87,32 +109,24 @@ const COLOR_PRESETS = [
     cardColor: "#1C1414"
   },
   {
-    name: "Bosque Ahumado (Hierbas)",
-    primaryColor: "#84CC16",
-    primaryDarkColor: "#65A30D",
-    accentColor: "#EAB308",
-    backgroundColor: "#090B06",
-    cardColor: "#161A0F"
-  },
-  {
-    name: "Carbón Eléctrico (Cian)",
-    primaryColor: "#06B6D4",
-    primaryDarkColor: "#0891B2",
-    accentColor: "#3B82F6",
-    backgroundColor: "#050B14",
-    cardColor: "#0E1726"
-  },
-  {
-    name: "Atardecer Criollo (Naranja)",
-    primaryColor: "#F97316",
-    primaryDarkColor: "#EA580C",
-    accentColor: "#EAB308",
-    backgroundColor: "#0F0B08",
-    cardColor: "#1A130E"
+    name: "Menta & Vainilla",
+    primaryColor: "#10B981",
+    primaryDarkColor: "#059669",
+    accentColor: "#34D399",
+    backgroundColor: "#06120E",
+    cardColor: "#0D221C"
   }
 ];
 
 const GRADIENT_PRESETS = [
+  {
+    id: "morado_noir",
+    name: "Lia Cookies & Terciopelo",
+    color1: "#320645",
+    color2: "#14031E",
+    direction: "to bottom",
+    preview: "linear-gradient(to bottom, #320645, #14031E)"
+  },
   {
     id: "fucsia_noir",
     name: "Fuego Fucsia & Carbón",
@@ -199,6 +213,22 @@ export default function App() {
 
   // Check if password remains the default "1234"
   const [isPassDefault, setIsPassDefault] = useState(false);
+  const [adminShowHiddenSpecialtyEditor, setAdminShowHiddenSpecialtyEditor] = useState(false);
+
+  // Intelligent persistence timestamps & local backup snapshots
+  const [lastSavedTimestamp, setLastSavedTimestamp] = useState<number | null>(() => {
+    const saved = localStorage.getItem("montepork_config_updated_at");
+    return saved ? parseInt(saved, 10) : null;
+  });
+
+  const [backupHistory, setBackupHistory] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem("montepork_backup_history");
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
 
   // Editable configurations state (initialized from localStorage or file defaults)
   const [categories, setCategories] = useState<MenuCategory[]>(() => {
@@ -298,40 +328,119 @@ export default function App() {
     storeSettings.accentColor,
   ]);
 
-  // Synchronize browser tab title dynamically with storeSettings
+  // Synchronize browser tab title and Open Graph/Twitter social meta tags dynamically with storeSettings
   useEffect(() => {
-    if (storeSettings.tabTitle !== undefined && storeSettings.tabTitle.trim() !== "") {
-      document.title = storeSettings.tabTitle;
-    } else if (storeSettings.heroTitle) {
-      document.title = `${storeSettings.heroTitle} | ${storeSettings.heroSubtitle || "El Más Crujiente de la Región"}`;
-    } else {
-      document.title = "MONTE PORK | El Más Crujiente de la Región";
-    }
-  }, [storeSettings.tabTitle, storeSettings.heroTitle, storeSettings.heroSubtitle]);
+    const heroTitle = storeSettings.heroTitle || "MONTE PORK";
+    const heroSubtitle = storeSettings.heroSubtitle || "El Más Crujiente de la Región";
+    const heroDescription =
+      storeSettings.heroDescription ||
+      "Chicharrón de verdad, macerado por 24 horas y explotado al momento. Mofongos, combos del coro y las cervezas más frías de la comarca.";
+    const fullTitle =
+      storeSettings.tabTitle !== undefined && storeSettings.tabTitle.trim() !== ""
+        ? storeSettings.tabTitle
+        : `${heroTitle} | ${heroSubtitle}`;
+
+    document.title = fullTitle;
+
+    const updateMetaTag = (attrName: string, attrVal: string, contentVal: string) => {
+      let element = document.querySelector(`meta[${attrName}="${attrVal}"]`);
+      if (!element) {
+        element = document.createElement("meta");
+        element.setAttribute(attrName, attrVal);
+        document.head.appendChild(element);
+      }
+      element.setAttribute("content", contentVal);
+    };
+
+    updateMetaTag("name", "title", fullTitle);
+    updateMetaTag("name", "description", heroDescription);
+    updateMetaTag("property", "og:title", fullTitle);
+    updateMetaTag("property", "og:description", heroDescription);
+    updateMetaTag("property", "og:site_name", heroTitle);
+    updateMetaTag("name", "twitter:title", fullTitle);
+    updateMetaTag("name", "twitter:description", heroDescription);
+  }, [storeSettings.tabTitle, storeSettings.heroTitle, storeSettings.heroSubtitle, storeSettings.heroDescription]);
 
   // Server-saved SHA-256 password hash (default is "1234")
   const [adminPasswordHash, setAdminPasswordHash] = useState(() => {
     return localStorage.getItem("montepork_admin_pwd_hash") || ADMIN_PASSWORD_HASH;
   });
 
-  // Load configuration from local server disk
+  // Intelligent bi-directional configuration synchronizer
   useEffect(() => {
     const loadConfig = async () => {
       try {
+        const localTimestampStr = localStorage.getItem("montepork_config_updated_at");
+        const localTimestamp = localTimestampStr ? parseInt(localTimestampStr, 10) : 0;
+        const savedCat = localStorage.getItem("montepork_categories");
+        const savedItems = localStorage.getItem("montepork_menu_items");
+        const hasLocalModifications = Boolean(savedCat || savedItems);
+
         const res = await fetch("/api/config");
         if (res.ok) {
           const data = await res.json();
           if (data.found) {
-            if (data.categories) setCategories(data.categories);
-            if (data.menuItems) setMenuItems(data.menuItems);
-            if (data.bankAccounts) setBankAccounts(data.bankAccounts);
-            if (data.rncHeader) setRncHeader(data.rncHeader);
-            if (data.contactInfo) setContactInfo(data.contactInfo);
-            if (data.storeSettings) setStoreSettings(data.storeSettings);
+            const serverTimestamp = typeof data.updatedAt === "number" ? data.updatedAt : 0;
+
+            // CASE 1: If browser localStorage has custom modifications and a newer timestamp than the static server file,
+            // DO NOT wipe the browser's state! Keep local state and auto-sync it to the PC server disk files.
+            if (hasLocalModifications && localTimestamp > serverTimestamp) {
+              setLastSavedTimestamp(localTimestamp);
+              try {
+                const currentLocalConfig = {
+                  categories: savedCat ? JSON.parse(savedCat) : categories,
+                  menuItems: savedItems ? JSON.parse(savedItems) : menuItems,
+                  bankAccounts,
+                  rncHeader,
+                  contactInfo,
+                  storeSettings,
+                  adminPasswordHash,
+                  updatedAt: localTimestamp
+                };
+                await fetch("/api/config", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(currentLocalConfig)
+                });
+              } catch (syncErr) {
+                console.warn("Auto-sync local config to server on boot:", syncErr);
+              }
+              return;
+            }
+
+            // CASE 2: Server has newer, matching, or initial configuration
+            if (data.categories) {
+              setCategories(data.categories);
+              safeSetLocalStorage("montepork_categories", JSON.stringify(data.categories));
+            }
+            if (data.menuItems) {
+              setMenuItems(data.menuItems);
+              safeSetLocalStorage("montepork_menu_items", JSON.stringify(data.menuItems));
+            }
+            if (data.bankAccounts) {
+              setBankAccounts(data.bankAccounts);
+              safeSetLocalStorage("montepork_bank_accounts", JSON.stringify(data.bankAccounts));
+            }
+            if (data.rncHeader) {
+              setRncHeader(data.rncHeader);
+              safeSetLocalStorage("montepork_rnc_header", data.rncHeader);
+            }
+            if (data.contactInfo) {
+              setContactInfo(data.contactInfo);
+              safeSetLocalStorage("montepork_contact_info", JSON.stringify(data.contactInfo));
+            }
+            if (data.storeSettings) {
+              setStoreSettings(data.storeSettings);
+              safeSetLocalStorage("montepork_store_settings", JSON.stringify(data.storeSettings));
+            }
             if (data.adminPasswordHash) {
               setAdminPasswordHash(data.adminPasswordHash);
               safeSetLocalStorage("montepork_admin_pwd_hash", data.adminPasswordHash);
             }
+
+            const effectiveTime = serverTimestamp || Date.now();
+            setLastSavedTimestamp(effectiveTime);
+            safeSetLocalStorage("montepork_config_updated_at", effectiveTime.toString());
           }
         }
       } catch (err) {
@@ -494,15 +603,48 @@ export default function App() {
   };
 
   const handleSaveAllChanges = async () => {
-    // 1. Save to localStorage safely as fallback copy
+    const now = Date.now();
+    setLastSavedTimestamp(now);
+
+    // 1. Save to localStorage safely as primary/fallback copy with timestamp
+    safeSetLocalStorage("montepork_config_updated_at", now.toString());
     safeSetLocalStorage("montepork_categories", JSON.stringify(categories));
     safeSetLocalStorage("montepork_menu_items", JSON.stringify(menuItems));
     safeSetLocalStorage("montepork_bank_accounts", JSON.stringify(bankAccounts));
     safeSetLocalStorage("montepork_rnc_header", rncHeader);
     safeSetLocalStorage("montepork_contact_info", JSON.stringify(contactInfo));
     safeSetLocalStorage("montepork_store_settings", JSON.stringify(storeSettings));
+    safeSetLocalStorage("montepork_admin_pwd_hash", adminPasswordHash);
+
+    // 2. Save snapshot in local backup history (keep up to 5 copies)
+    try {
+      const newSnapshot = {
+        id: `snap_${now}`,
+        timestamp: now,
+        date: new Date(now).toLocaleString("es-DO", { dateStyle: "short", timeStyle: "medium" }),
+        itemCount: menuItems.length,
+        categoryCount: categories.length,
+        config: {
+          categories,
+          menuItems,
+          bankAccounts,
+          rncHeader,
+          contactInfo,
+          storeSettings,
+          adminPasswordHash,
+          updatedAt: now
+        }
+      };
+      const existing = localStorage.getItem("montepork_backup_history");
+      const list = existing ? JSON.parse(existing) : [];
+      const updatedList = [newSnapshot, ...list.filter((s: any) => s.id !== newSnapshot.id)].slice(0, 5);
+      setBackupHistory(updatedList);
+      safeSetLocalStorage("montepork_backup_history", JSON.stringify(updatedList));
+    } catch (e) {
+      console.warn("Could not save snapshot history:", e);
+    }
     
-    // 2. Submit to server disk file
+    // 3. Submit to server disk file
     try {
       const response = await fetch("/api/config", {
         method: "POST",
@@ -516,21 +658,62 @@ export default function App() {
           rncHeader,
           contactInfo,
           storeSettings,
-          adminPasswordHash
+          adminPasswordHash,
+          updatedAt: now
         }),
       });
       if (response.ok) {
         setHasUnsavedChanges(false);
-        showToast("💾 ¡Todos los cambios han sido guardados con éxito en el servidor! 🔥");
+        showToast("💾 ¡Cambios guardados en disco y en navegador exitosamente! 🔥");
       } else {
         // Still marked saved locally
         setHasUnsavedChanges(false);
-        showToast("💾 Cambios guardados localmente con éxito.");
+        showToast("💾 Cambios guardados en memoria local con éxito.");
       }
     } catch (err) {
       console.warn("Server API sync fallback:", err);
       setHasUnsavedChanges(false);
-      showToast("💾 Cambios guardados con éxito.");
+      showToast("💾 Cambios guardados en memoria local con éxito.");
+    }
+  };
+
+  // Restore state from a historical snapshot
+  const handleRestoreSnapshot = (snapshot: any) => {
+    if (!snapshot || !snapshot.config) return;
+    const { config } = snapshot;
+    if (config.categories) setCategories(config.categories);
+    if (config.menuItems) setMenuItems(config.menuItems);
+    if (config.bankAccounts) setBankAccounts(config.bankAccounts);
+    if (config.rncHeader) setRncHeader(config.rncHeader);
+    if (config.contactInfo) setContactInfo(config.contactInfo);
+    if (config.storeSettings) setStoreSettings(config.storeSettings);
+    if (config.adminPasswordHash) setAdminPasswordHash(config.adminPasswordHash);
+
+    setHasUnsavedChanges(true);
+    showToast(`🔄 ¡Copia de seguridad (${snapshot.date}) restaurada! Haz clic en 'Guardar Cambios' para fijarla.`);
+  };
+
+  // Restore state directly from browser memory
+  const handleRestoreFromBrowserMemory = () => {
+    try {
+      const cat = localStorage.getItem("montepork_categories");
+      const items = localStorage.getItem("montepork_menu_items");
+      const banks = localStorage.getItem("montepork_bank_accounts");
+      const rnc = localStorage.getItem("montepork_rnc_header");
+      const contact = localStorage.getItem("montepork_contact_info");
+      const settings = localStorage.getItem("montepork_store_settings");
+
+      if (cat) setCategories(JSON.parse(cat));
+      if (items) setMenuItems(JSON.parse(items));
+      if (banks) setBankAccounts(JSON.parse(banks));
+      if (rnc) setRncHeader(rnc);
+      if (contact) setContactInfo(JSON.parse(contact));
+      if (settings) setStoreSettings(JSON.parse(settings));
+
+      setHasUnsavedChanges(true);
+      showToast("⚡ Datos recuperados de la memoria local del navegador.");
+    } catch (e) {
+      showToast("⚠️ Error al leer datos locales.");
     }
   };
 
@@ -828,7 +1011,7 @@ export default function App() {
             />
             <div className="space-y-1">
               <span className="text-primary text-xs font-black uppercase tracking-widest font-display block">Acceso Administrativo</span>
-              <h1 className="text-2xl font-display font-black text-white">Panel Monte Pork</h1>
+              <h1 className="text-2xl font-display font-black text-white">{storeSettings.heroTitle}</h1>
             </div>
             <p className="text-xs text-gray-400 font-light">
               Ingresa la clave de administración para realizar cambios instantáneos en la carta, fotos e información.
@@ -865,7 +1048,7 @@ export default function App() {
               style={{ backgroundColor: "var(--color-primary)" }}
             >
               <Unlock className="w-4 h-4 shrink-0" />
-              <span>Entrar al Horno</span>
+              <span>Entrar al Panel</span>
             </button>
           </form>
 
@@ -890,16 +1073,16 @@ export default function App() {
       {/* Dynamic Theme Color Stylesheet Overrides */}
       <style>{`
         :root {
-          --primary-color: ${storeSettings.primaryColor || '#E8005A'};
-          --primary-dark-color: ${storeSettings.primaryDarkColor || '#C20042'};
-          --bg-color: ${storeSettings.backgroundColor || '#0A0A0B'};
-          --card-color: ${storeSettings.cardColor || '#141416'};
-          --accent-color: ${storeSettings.accentColor || '#FFB800'};
+          --primary-color: ${storeSettings.primaryColor || '#8A1C9E'};
+          --primary-dark-color: ${storeSettings.primaryDarkColor || '#5A0C6B'};
+          --bg-color: ${storeSettings.backgroundColor || '#14031E'};
+          --card-color: ${storeSettings.cardColor || '#230A33'};
+          --accent-color: ${storeSettings.accentColor || '#FF2A85'};
         }
         
         /* Ensure custom properties apply correctly with dynamic style injection */
         body {
-          background-color: var(--color-dark-bg, #0A0A0B) !important;
+          background-color: var(--color-dark-bg, #14031E) !important;
         }
       `}</style>
       
@@ -911,7 +1094,7 @@ export default function App() {
               <Shield className="w-4 h-4" />
             </div>
             <div>
-              <span className="text-xs uppercase font-display font-black tracking-widest text-primary block leading-tight">Panel Administrativo (Monte Pork)</span>
+              <span className="text-xs uppercase font-display font-black tracking-widest text-primary block leading-tight">Panel Administrativo ({storeSettings.heroTitle})</span>
               <span className="text-[10px] text-gray-400 font-mono">Modo de Vista: {isAdminPreviewMode ? "👁️ Vista Cliente" : "✍️ Edición Directa"}</span>
             </div>
           </div>
@@ -1566,11 +1749,53 @@ export default function App() {
                 </span>
                 <input
                   type="text"
-                  value={storeSettings.menuTagline !== undefined ? storeSettings.menuTagline : "El Más Crujiente"}
+                  value={storeSettings.menuTagline !== undefined ? storeSettings.menuTagline : "Dulce Experiencia de Sabores"}
                   onChange={(e) => handleUpdateSetting("menuTagline", e.target.value)}
                   className="w-full bg-black/35 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-primary"
-                  placeholder="El Más Crujiente"
+                  placeholder="Dulce Experiencia de Sabores"
                 />
+              </div>
+
+              {/* Specialty / Oferta de Apertura Section Visibility Control */}
+              <div className="space-y-2.5 bg-black/40 border border-white/10 rounded-2xl p-4 animate-fadeIn">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase text-gray-400 font-bold tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-primary" />
+                    <span>Sección "Oferta de Apertura" / Especialidad</span>
+                  </span>
+                  
+                  <div className="flex items-center gap-1 bg-black/60 p-1 rounded-xl border border-white/10 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateSetting("showSpecialtySection", true)}
+                      className={`px-3 py-1 rounded-lg font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                        storeSettings.showSpecialtySection !== false
+                          ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/30"
+                          : "text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      <Eye className="w-3 h-3" />
+                      <span>Visible</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateSetting("showSpecialtySection", false)}
+                      className={`px-3 py-1 rounded-lg font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                        storeSettings.showSpecialtySection === false
+                          ? "bg-red-500 text-white shadow-md shadow-red-500/30"
+                          : "text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      <EyeOff className="w-3 h-3" />
+                      <span>Oculta</span>
+                    </button>
+                  </div>
+                </div>
+                <p className="text-[11px] text-gray-300 font-light">
+                  {storeSettings.showSpecialtySection !== false
+                    ? "La sección está activa y visible para todos los clientes en la portada."
+                    : "La sección está oculta. El menú principal y los productos suben automáticamente a su lugar."}
+                </p>
               </div>
 
               {/* Browser Tab Title Customization */}
@@ -1652,17 +1877,98 @@ export default function App() {
 
             <div className="text-center space-y-2">
               <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 mx-auto border border-amber-500/35">
-                <FileJson className="w-6 h-6" />
+                <HardDrive className="w-6 h-6 text-amber-400" />
               </div>
               <h3 className="text-lg font-display font-black text-white">
-                Copia de Seguridad y Configuración JSON 📁
+                Copia de Seguridad y Sincronización Permanente 🛡️
               </h3>
               <p className="text-xs text-gray-400 font-light leading-relaxed">
-                Descarga una copia completa de todos tus platos, categorías, precios y colores en un archivo <code className="text-amber-400 font-mono">store_config.json</code> o cárgalo para restaurarlo al instante en cualquier navegador o despliegue.
+                Tus modificaciones están protegidas por doble capa: se guardan en el servidor de tu PC y en la memoria local con protección contra sobreescritura.
               </p>
             </div>
 
+            {/* Sync Status Banner */}
+            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-3.5 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></div>
+                <div>
+                  <h4 className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
+                    <span>Sincronización Inteligente Activa</span>
+                  </h4>
+                  <p className="text-[10px] text-gray-300">
+                    {lastSavedTimestamp
+                      ? `Último guardado: ${new Date(lastSavedTimestamp).toLocaleString("es-DO", { dateStyle: "short", timeStyle: "medium" })}`
+                      : "Tus datos están sincronizados en tiempo real."}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleSaveAllChanges}
+                className="px-2.5 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-300 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer shrink-0 transition-all"
+                title="Guarda inmediatamente al servidor de tu PC"
+              >
+                <HardDrive className="w-3 h-3" />
+                <span>Guardar en PC</span>
+              </button>
+            </div>
+
             <div className="space-y-4">
+              {/* Quick Recovery Tool */}
+              <div className="bg-black/40 border border-white/10 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <RefreshCw className="w-4 h-4 text-amber-400" />
+                      <span>Recuperar Memoria Local del Navegador</span>
+                    </h4>
+                    <p className="text-[11px] text-gray-400">
+                      Recarga instantáneamente la última versión guardada en la memoria de este navegador.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRestoreFromBrowserMemory}
+                    className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md shrink-0"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Recuperar</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Snapshot History */}
+              {backupHistory && backupHistory.length > 0 && (
+                <div className="bg-black/40 border border-white/10 rounded-2xl p-4 space-y-2.5">
+                  <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <History className="w-4 h-4 text-purple-400" />
+                    <span>Historial de Copias Automáticas ({backupHistory.length})</span>
+                  </h4>
+                  <div className="space-y-2 max-h-36 overflow-y-auto pr-1 custom-scrollbar">
+                    {backupHistory.map((snap: any) => (
+                      <div
+                        key={snap.id}
+                        className="bg-black/50 border border-white/10 rounded-xl p-2.5 flex items-center justify-between gap-2"
+                      >
+                        <div className="text-[11px] text-gray-300 space-y-0.5 truncate">
+                          <p className="font-semibold text-white">{snap.date}</p>
+                          <p className="text-[10px] text-gray-400 font-mono">
+                            {snap.itemCount || 0} platos • {snap.categoryCount || 0} categorías
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRestoreSnapshot(snap)}
+                          className="px-2.5 py-1 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 text-purple-300 rounded-lg text-[10px] font-bold transition-all cursor-pointer shrink-0"
+                        >
+                          Restaurar
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Export Button */}
               <div className="bg-black/40 border border-white/10 rounded-2xl p-4 space-y-3">
                 <div className="flex items-center justify-between">
@@ -1715,10 +2021,10 @@ export default function App() {
               <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3.5 text-xs text-amber-200/90 space-y-1">
                 <div className="flex items-center gap-1.5 font-bold text-amber-300">
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  <span>Persistencia en Vercel & Producción:</span>
+                  <span>Protección Total contra Reinicio:</span>
                 </div>
                 <p className="text-[11px] leading-relaxed text-gray-300 font-light">
-                  Cada vez que guardas tus cambios en este panel, el servidor actualiza automáticamente los archivos <code className="text-amber-300 font-mono text-[10px]">src/store_config.json</code> y <code className="text-amber-300 font-mono text-[10px]">data/store_config.json</code> en disco. Al compilar o subir el código a Vercel, todos tus platos, datos bancarios y personalizaciones quedan grabados permanentemente.
+                  Al copiar archivos actualizados desde Google AI Studio a tu PC, tus platos, categorías y modificaciones guardadas en tu navegador prevalecerán automáticamente gracias a la comparación de marcas de tiempo y se re-sincronizarán inmediatamente con los archivos en disco del servidor.
                 </p>
               </div>
             </div>
@@ -2124,203 +2430,424 @@ export default function App() {
         </div>
       </section>
 
-      {/* Signature Dishes Showcase (Nuestra Especialidad) */}
-      <section className="bg-gradient-to-b from-dark-bg to-dark-card py-16 px-4 md:px-8">
-        <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 items-center bg-black/45 rounded-3xl p-6 md:p-10 border border-white/5 relative overflow-hidden">
-          {/* Neon lights */}
-          <div className="absolute top-0 right-0 w-40 h-40 bg-primary/10 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-0 left-0 w-40 h-40 bg-wine/20 rounded-full blur-3xl"></div>
+      {/* Signature Dishes Showcase (Nuestra Especialidad / Oferta de Apertura) */}
+      {(() => {
+        const isSpecialtyVisible = storeSettings.showSpecialtySection !== false;
+        
+        // If not visible and customer mode (or preview mode), render NOTHING so lower content slides directly up
+        if (!isSpecialtyVisible && (!isAdminLogged || isAdminPreviewMode)) {
+          return null;
+        }
 
-          <div className="space-y-4">
-            <div className="inline-flex items-center gap-1.5 bg-primary/20 border border-primary/30 px-3 py-1 rounded-full text-xs font-display font-black text-primary uppercase tracking-wider animate-pulse">
-              <Sparkles className="w-3.5 h-3.5 fill-primary" />
-              {isAdminLogged && !isAdminPreviewMode ? (
-                <input
-                  type="text"
-                  value={storeSettings.specialtyBadge}
-                  onChange={(e) => handleUpdateSetting("specialtyBadge", e.target.value)}
-                  className="bg-transparent text-primary focus:outline-none text-xs font-black uppercase tracking-wider font-display max-w-[150px]"
-                />
-              ) : (
-                <span>{storeSettings.specialtyBadge}</span>
+        // If not visible and in Admin Mode, show a dedicated admin banner with quick re-enable button and collapsible editor
+        if (!isSpecialtyVisible && isAdminLogged && !isAdminPreviewMode) {
+          return (
+            <section className="bg-gradient-to-b from-dark-bg to-dark-card py-6 px-4 md:px-8 border-y border-amber-500/20">
+              <div className="max-w-5xl mx-auto space-y-4">
+                <div className="bg-black/60 border-2 border-dashed border-amber-500/40 rounded-3xl p-6 text-center space-y-3">
+                  <div className="flex items-center justify-center gap-2 text-amber-400 font-display font-black text-sm uppercase tracking-wider">
+                    <EyeOff className="w-5 h-5 text-amber-400" />
+                    <span>Sección "Oferta de Apertura" / Especialidad: OCULTA</span>
+                  </div>
+                  <p className="text-xs text-gray-300 max-w-lg mx-auto">
+                    Esta sección está oculta para los clientes. El menú principal y los productos suben automáticamente a su lugar. Puedes volver a activarla cuando desees.
+                  </p>
+                  <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleUpdateSetting("showSpecialtySection", true);
+                        showToast("👁️ ¡Sección de Oferta de Apertura activada y visible para clientes!");
+                      }}
+                      className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl text-xs font-display font-black uppercase tracking-wider transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2 cursor-pointer"
+                    >
+                      <Eye className="w-4 h-4" />
+                      <span>Mostrar / Activar Sección</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAdminShowHiddenSpecialtyEditor(!adminShowHiddenSpecialtyEditor)}
+                      className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-gray-200 border border-white/10 rounded-2xl text-xs font-display font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                      <span>{adminShowHiddenSpecialtyEditor ? "Ocultar Editor" : "Ver / Editar contenido mientras está oculta"}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Collapsible Editor when hidden */}
+                {adminShowHiddenSpecialtyEditor && (
+                  <div className="opacity-95 border-2 border-dashed border-white/20 rounded-3xl p-6 md:p-10 bg-black/55 relative overflow-hidden grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                    <div className="lg:col-span-2 bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-mono px-3.5 py-1.5 rounded-xl flex items-center justify-between">
+                      <span>⚠️ Modo edición activado (La sección sigue oculta al público hasta que presiones 'Mostrar / Activar')</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleUpdateSetting("showSpecialtySection", true);
+                          showToast("👁️ ¡Sección de Oferta de Apertura activada!");
+                        }}
+                        className="text-xs text-white underline font-bold hover:text-emerald-400 cursor-pointer"
+                      >
+                        Hacer visible ahora
+                      </button>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="inline-flex items-center gap-1.5 bg-primary/20 border border-primary/30 px-3 py-1 rounded-full text-xs font-display font-black text-primary uppercase tracking-wider animate-pulse">
+                        <Sparkles className="w-3.5 h-3.5 fill-primary" />
+                        <input
+                          type="text"
+                          value={storeSettings.specialtyBadge}
+                          onChange={(e) => handleUpdateSetting("specialtyBadge", e.target.value)}
+                          className="bg-transparent text-primary focus:outline-none text-xs font-black uppercase tracking-wider font-display max-w-[150px]"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          value={storeSettings.specialtyTitle}
+                          onChange={(e) => handleUpdateSetting("specialtyTitle", e.target.value)}
+                          className="w-full bg-black/45 border border-white/10 rounded-xl px-3 py-1.5 text-lg font-display font-bold text-white focus:outline-none focus:border-primary font-sans"
+                          placeholder="Título de la especialidad..."
+                        />
+                        <input
+                          type="text"
+                          value={storeSettings.specialtyTitleHighlight}
+                          onChange={(e) => handleUpdateSetting("specialtyTitleHighlight", e.target.value)}
+                          className="w-full bg-black/45 border border-white/10 rounded-xl px-3 py-1.5 text-lg font-display font-bold text-primary focus:outline-none focus:border-primary font-sans"
+                          style={{ color: "var(--color-primary)" }}
+                          placeholder="Destacado (fucsia)..."
+                        />
+                      </div>
+                      
+                      <textarea
+                        rows={3}
+                        value={storeSettings.specialtyDescription}
+                        onChange={(e) => handleUpdateSetting("specialtyDescription", e.target.value)}
+                        className="w-full bg-black/45 border border-white/10 rounded-xl p-3 text-sm text-gray-300 focus:outline-none focus:border-primary font-sans"
+                        placeholder="Descripción de la especialidad..."
+                      />
+
+                      <div className="flex items-center gap-6 py-2 border-t border-b border-white/5 my-4 font-sans">
+                        <div className="space-y-1">
+                          <input
+                            type="text"
+                            value={storeSettings.specialtyPriceLabel}
+                            onChange={(e) => handleUpdateSetting("specialtyPriceLabel", e.target.value)}
+                            className="bg-black/45 border border-white/10 rounded-lg px-2 py-0.5 text-[10px] text-gray-500 font-mono focus:outline-none w-24 block"
+                          />
+                          <input
+                            type="text"
+                            value={storeSettings.specialtyPriceValue}
+                            onChange={(e) => handleUpdateSetting("specialtyPriceValue", e.target.value)}
+                            className="bg-black/45 border border-white/10 rounded-lg px-2 py-0.5 text-xs font-bold text-white focus:outline-none w-24 block"
+                          />
+                        </div>
+                        <div className="h-8 w-px bg-white/10"></div>
+                        <div className="space-y-1">
+                          <input
+                            type="text"
+                            value={storeSettings.specialtyFlavorLabel}
+                            onChange={(e) => handleUpdateSetting("specialtyFlavorLabel", e.target.value)}
+                            className="bg-black/45 border border-white/10 rounded-lg px-2 py-0.5 text-[10px] text-gray-500 font-mono focus:outline-none w-28 block"
+                          />
+                          <input
+                            type="text"
+                            value={storeSettings.specialtyFlavorValue}
+                            onChange={(e) => handleUpdateSetting("specialtyFlavorValue", e.target.value)}
+                            className="bg-black/45 border border-white/10 rounded-lg px-2 py-0.5 text-xs font-bold text-white focus:outline-none w-28 block"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 bg-black/45 border border-white/10 rounded-xl px-3 py-2">
+                        <span className="text-xs text-gray-400 font-mono">Boton Especialidad:</span>
+                        <input
+                          type="text"
+                          value={storeSettings.specialtyButtonText || "Pedir Six Pack"}
+                          onChange={(e) => handleUpdateSetting("specialtyButtonText", e.target.value)}
+                          className="bg-transparent text-white focus:outline-none text-xs font-bold font-sans"
+                          placeholder="Pedir Six Pack"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="relative rounded-2xl overflow-hidden aspect-square border border-white/10 shadow-2xl shadow-black group">
+                        <img
+                          src={storeSettings.specialtyImage || mofongoImage}
+                          alt="Especialidad"
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none"></div>
+                        
+                        <div className="absolute bottom-4 left-4 right-4 z-10 pointer-events-auto">
+                          <div className="space-y-1 bg-black/70 backdrop-blur-md p-2 rounded-xl border border-white/10">
+                            <input
+                              type="text"
+                              value={storeSettings.specialtyPhotoBadge || "Lleva más, comparte más"}
+                              onChange={(e) => handleUpdateSetting("specialtyPhotoBadge", e.target.value)}
+                              className="text-[10px] font-display font-medium text-primary uppercase tracking-wider block bg-transparent focus:outline-none w-full"
+                              placeholder="Etiqueta"
+                            />
+                            <input
+                              type="text"
+                              value={storeSettings.specialtyPhotoCaption || "Six Pack de Cookies surtidas"}
+                              onChange={(e) => handleUpdateSetting("specialtyPhotoCaption", e.target.value)}
+                              className="text-xs font-bold text-white block bg-transparent focus:outline-none w-full"
+                              placeholder="Pie de foto"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-black/60 border border-white/10 rounded-2xl p-3">
+                        <span className="text-[10px] uppercase font-bold text-gray-400 block mb-1.5">
+                          Cambiar / Sustituir Foto de la Especialidad (.png o .jpg)
+                        </span>
+                        <ImageDropUpload
+                          currentImage={storeSettings.specialtyImage}
+                          onImageChange={(val) => handleUpdateSetting("specialtyImage", val)}
+                          label="Foto de la Especialidad"
+                          aspectRatio="square"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
+          );
+        }
+
+        // Section is visible
+        return (
+          <section className="bg-gradient-to-b from-dark-bg to-dark-card py-16 px-4 md:px-8">
+            <div className="max-w-5xl mx-auto space-y-4">
+              {/* Admin Visibility Bar */}
+              {isAdminLogged && !isAdminPreviewMode && (
+                <div className="flex flex-wrap items-center justify-between gap-3 bg-black/60 border border-emerald-500/30 p-3 rounded-2xl shadow-lg">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span className="text-xs font-bold text-white font-display uppercase tracking-wide">
+                      Sección "Oferta de Apertura": <span className="text-emerald-400 font-extrabold">ACTIVA (Visible para los clientes)</span>
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleUpdateSetting("showSpecialtySection", false);
+                      showToast("🙈 Sección de Oferta de Apertura ocultada. ¡Recuerda guardar!");
+                    }}
+                    className="px-3.5 py-1.5 bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-300 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                    title="Ocultar esta sección para que los clientes no la vean"
+                  >
+                    <EyeOff className="w-3.5 h-3.5 text-red-400" />
+                    <span>Ocultar sección (subir menú)</span>
+                  </button>
+                </div>
               )}
-            </div>
-            
-            {isAdminLogged && !isAdminPreviewMode ? (
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  value={storeSettings.specialtyTitle}
-                  onChange={(e) => handleUpdateSetting("specialtyTitle", e.target.value)}
-                  className="w-full bg-black/45 border border-white/10 rounded-xl px-3 py-1.5 text-lg font-display font-bold text-white focus:outline-none focus:border-primary font-sans"
-                  placeholder="Título de la especialidad..."
-                />
-                <input
-                  type="text"
-                  value={storeSettings.specialtyTitleHighlight}
-                  onChange={(e) => handleUpdateSetting("specialtyTitleHighlight", e.target.value)}
-                  className="w-full bg-black/45 border border-white/10 rounded-xl px-3 py-1.5 text-lg font-display font-bold text-primary focus:outline-none focus:border-primary font-sans"
-                  style={{ color: "var(--color-primary)" }}
-                  placeholder="Destacado (fucsia)..."
-                />
-              </div>
-            ) : (
-              <h2 className="text-3xl md:text-4xl font-display font-black text-white tracking-tight">
-                {storeSettings.specialtyTitle} <span className="text-primary text-pulse-glow" style={{ color: "var(--color-primary)" }}>{storeSettings.specialtyTitleHighlight}</span>
-              </h2>
-            )}
-            
-            {isAdminLogged && !isAdminPreviewMode ? (
-              <textarea
-                rows={3}
-                value={storeSettings.specialtyDescription}
-                onChange={(e) => handleUpdateSetting("specialtyDescription", e.target.value)}
-                className="w-full bg-black/45 border border-white/10 rounded-xl p-3 text-sm text-gray-300 focus:outline-none focus:border-primary font-sans"
-                placeholder="Descripción de la especialidad..."
-              />
-            ) : (
-              <p className="text-sm md:text-base text-gray-300 font-light leading-relaxed">
-                {storeSettings.specialtyDescription}
-              </p>
-            )}
 
-            <div className="flex items-center gap-6 py-2 border-t border-b border-white/5 my-4 font-sans">
-              <div>
-                {isAdminLogged && !isAdminPreviewMode ? (
-                  <div className="space-y-1">
-                    <input
-                      type="text"
-                      value={storeSettings.specialtyPriceLabel}
-                      onChange={(e) => handleUpdateSetting("specialtyPriceLabel", e.target.value)}
-                      className="bg-black/45 border border-white/10 rounded-lg px-2 py-0.5 text-[10px] text-gray-500 font-mono focus:outline-none w-24 block"
-                    />
-                    <input
-                      type="text"
-                      value={storeSettings.specialtyPriceValue}
-                      onChange={(e) => handleUpdateSetting("specialtyPriceValue", e.target.value)}
-                      className="bg-black/45 border border-white/10 rounded-lg px-2 py-0.5 text-xs font-bold text-white focus:outline-none w-24 block"
-                    />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center bg-black/45 rounded-3xl p-6 md:p-10 border border-white/5 relative overflow-hidden">
+                {/* Neon lights */}
+                <div className="absolute top-0 right-0 w-40 h-40 bg-primary/10 rounded-full blur-3xl"></div>
+                <div className="absolute bottom-0 left-0 w-40 h-40 bg-wine/20 rounded-full blur-3xl"></div>
+
+                <div className="space-y-4">
+                  <div className="inline-flex items-center gap-1.5 bg-primary/20 border border-primary/30 px-3 py-1 rounded-full text-xs font-display font-black text-primary uppercase tracking-wider animate-pulse">
+                    <Sparkles className="w-3.5 h-3.5 fill-primary" />
+                    {isAdminLogged && !isAdminPreviewMode ? (
+                      <input
+                        type="text"
+                        value={storeSettings.specialtyBadge}
+                        onChange={(e) => handleUpdateSetting("specialtyBadge", e.target.value)}
+                        className="bg-transparent text-primary focus:outline-none text-xs font-black uppercase tracking-wider font-display max-w-[150px]"
+                      />
+                    ) : (
+                      <span>{storeSettings.specialtyBadge}</span>
+                    )}
                   </div>
-                ) : (
-                  <>
-                    <span className="text-xs text-gray-500 uppercase tracking-widest font-display block">{storeSettings.specialtyPriceLabel}</span>
-                    <span className="text-2xl font-black font-mono text-white">{storeSettings.specialtyPriceValue}</span>
-                  </>
-                )}
-              </div>
-              <div className="h-8 w-px bg-white/10"></div>
-              <div>
-                {isAdminLogged && !isAdminPreviewMode ? (
-                  <div className="space-y-1">
-                    <input
-                      type="text"
-                      value={storeSettings.specialtyFlavorLabel}
-                      onChange={(e) => handleUpdateSetting("specialtyFlavorLabel", e.target.value)}
-                      className="bg-black/45 border border-white/10 rounded-lg px-2 py-0.5 text-[10px] text-gray-500 font-mono focus:outline-none w-28 block"
+                  
+                  {isAdminLogged && !isAdminPreviewMode ? (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={storeSettings.specialtyTitle}
+                        onChange={(e) => handleUpdateSetting("specialtyTitle", e.target.value)}
+                        className="w-full bg-black/45 border border-white/10 rounded-xl px-3 py-1.5 text-lg font-display font-bold text-white focus:outline-none focus:border-primary font-sans"
+                        placeholder="Título de la especialidad..."
+                      />
+                      <input
+                        type="text"
+                        value={storeSettings.specialtyTitleHighlight}
+                        onChange={(e) => handleUpdateSetting("specialtyTitleHighlight", e.target.value)}
+                        className="w-full bg-black/45 border border-white/10 rounded-xl px-3 py-1.5 text-lg font-display font-bold text-primary focus:outline-none focus:border-primary font-sans"
+                        style={{ color: "var(--color-primary)" }}
+                        placeholder="Destacado (fucsia)..."
+                      />
+                    </div>
+                  ) : (
+                    <h2 className="text-3xl md:text-4xl font-display font-black text-white tracking-tight">
+                      {storeSettings.specialtyTitle} <span className="text-primary text-pulse-glow" style={{ color: "var(--color-primary)" }}>{storeSettings.specialtyTitleHighlight}</span>
+                    </h2>
+                  )}
+                  
+                  {isAdminLogged && !isAdminPreviewMode ? (
+                    <textarea
+                      rows={3}
+                      value={storeSettings.specialtyDescription}
+                      onChange={(e) => handleUpdateSetting("specialtyDescription", e.target.value)}
+                      className="w-full bg-black/45 border border-white/10 rounded-xl p-3 text-sm text-gray-300 focus:outline-none focus:border-primary font-sans"
+                      placeholder="Descripción de la especialidad..."
                     />
-                    <input
-                      type="text"
-                      value={storeSettings.specialtyFlavorValue}
-                      onChange={(e) => handleUpdateSetting("specialtyFlavorValue", e.target.value)}
-                      className="bg-black/45 border border-white/10 rounded-lg px-2 py-0.5 text-xs font-bold text-white focus:outline-none w-28 block"
-                    />
+                  ) : (
+                    <p className="text-sm md:text-base text-gray-300 font-light leading-relaxed">
+                      {storeSettings.specialtyDescription}
+                    </p>
+                  )}
+
+                  <div className="flex items-center gap-6 py-2 border-t border-b border-white/5 my-4 font-sans">
+                    <div>
+                      {isAdminLogged && !isAdminPreviewMode ? (
+                        <div className="space-y-1">
+                          <input
+                            type="text"
+                            value={storeSettings.specialtyPriceLabel}
+                            onChange={(e) => handleUpdateSetting("specialtyPriceLabel", e.target.value)}
+                            className="bg-black/45 border border-white/10 rounded-lg px-2 py-0.5 text-[10px] text-gray-500 font-mono focus:outline-none w-24 block"
+                          />
+                          <input
+                            type="text"
+                            value={storeSettings.specialtyPriceValue}
+                            onChange={(e) => handleUpdateSetting("specialtyPriceValue", e.target.value)}
+                            className="bg-black/45 border border-white/10 rounded-lg px-2 py-0.5 text-xs font-bold text-white focus:outline-none w-24 block"
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          <span className="text-xs text-gray-500 uppercase tracking-widest font-display block">{storeSettings.specialtyPriceLabel}</span>
+                          <span className="text-2xl font-black font-mono text-white">{storeSettings.specialtyPriceValue}</span>
+                        </>
+                      )}
+                    </div>
+                    <div className="h-8 w-px bg-white/10"></div>
+                    <div>
+                      {isAdminLogged && !isAdminPreviewMode ? (
+                        <div className="space-y-1">
+                          <input
+                            type="text"
+                            value={storeSettings.specialtyFlavorLabel}
+                            onChange={(e) => handleUpdateSetting("specialtyFlavorLabel", e.target.value)}
+                            className="bg-black/45 border border-white/10 rounded-lg px-2 py-0.5 text-[10px] text-gray-500 font-mono focus:outline-none w-28 block"
+                          />
+                          <input
+                            type="text"
+                            value={storeSettings.specialtyFlavorValue}
+                            onChange={(e) => handleUpdateSetting("specialtyFlavorValue", e.target.value)}
+                            className="bg-black/45 border border-white/10 rounded-lg px-2 py-0.5 text-xs font-bold text-white focus:outline-none w-28 block"
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          <span className="text-xs text-gray-500 uppercase tracking-widest font-display block">{storeSettings.specialtyFlavorLabel}</span>
+                          <span className="text-sm font-bold text-gray-300">{storeSettings.specialtyFlavorValue}</span>
+                        </>
+                      )}
+                    </div>
                   </div>
-                ) : (
-                  <>
-                    <span className="text-xs text-gray-500 uppercase tracking-widest font-display block">{storeSettings.specialtyFlavorLabel}</span>
-                    <span className="text-sm font-bold text-gray-300">{storeSettings.specialtyFlavorValue}</span>
-                  </>
-                )}
+
+                  {isAdminLogged && !isAdminPreviewMode ? (
+                    <div className="flex items-center gap-2 bg-black/45 border border-white/10 rounded-xl px-3 py-2">
+                      <span className="text-xs text-gray-400 font-mono">Boton Especialidad:</span>
+                      <input
+                        type="text"
+                        value={storeSettings.specialtyButtonText || "Pedir Six Pack"}
+                        onChange={(e) => handleUpdateSetting("specialtyButtonText", e.target.value)}
+                        className="bg-transparent text-white focus:outline-none text-xs font-bold font-sans"
+                        placeholder="Pedir Six Pack"
+                      />
+                    </div>
+                  ) : (
+                    <button
+                      id="btn-specialty-add-to-cart"
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleAddSpecialtyToCart();
+                      }}
+                      style={{ backgroundColor: "var(--color-primary)" }}
+                      className="px-6 py-3 rounded-xl font-display font-bold text-sm text-white hover:opacity-90 transform active:scale-95 transition-all flex items-center gap-2 cursor-pointer shadow-lg shadow-primary/20"
+                    >
+                      <ShoppingBag className="w-4 h-4 shrink-0" />
+                      <span>{storeSettings.specialtyButtonText || "Pedir Six Pack"}</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Photo & Custom Photo Editor */}
+                <div className="space-y-3">
+                  <div className="relative rounded-2xl overflow-hidden aspect-square border border-white/10 shadow-2xl shadow-black group">
+                    <img
+                      src={storeSettings.specialtyImage || mofongoImage}
+                      alt="Especialidad"
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover transform duration-500 hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none"></div>
+                    
+                    <div className="absolute bottom-4 left-4 right-4 z-10 pointer-events-auto">
+                      {isAdminLogged && !isAdminPreviewMode ? (
+                        <div className="space-y-1 bg-black/70 backdrop-blur-md p-2 rounded-xl border border-white/10">
+                          <input
+                            type="text"
+                            value={storeSettings.specialtyPhotoBadge || "Lleva más, comparte más"}
+                            onChange={(e) => handleUpdateSetting("specialtyPhotoBadge", e.target.value)}
+                            className="text-[10px] font-display font-medium text-primary uppercase tracking-wider block bg-transparent focus:outline-none w-full"
+                            placeholder="Etiqueta"
+                          />
+                          <input
+                            type="text"
+                            value={storeSettings.specialtyPhotoCaption || "Six Pack de Cookies surtidas"}
+                            onChange={(e) => handleUpdateSetting("specialtyPhotoCaption", e.target.value)}
+                            className="text-xs font-bold text-white block bg-transparent focus:outline-none w-full"
+                            placeholder="Pie de foto"
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          <span className="text-xs font-display font-medium text-gray-400 uppercase tracking-wider block">
+                            {storeSettings.specialtyPhotoBadge || "Lleva más, comparte más"}
+                          </span>
+                          <span className="text-sm font-bold text-white">
+                            {storeSettings.specialtyPhotoCaption || "Six Pack de Cookies surtidas"}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* In Admin Mode: Photo Uploader / Replacer */}
+                  {isAdminLogged && !isAdminPreviewMode && (
+                    <div className="bg-black/60 border border-white/10 rounded-2xl p-3">
+                      <span className="text-[10px] uppercase font-bold text-gray-400 block mb-1.5">
+                        Cambiar / Sustituir Foto de la Especialidad (.png o .jpg)
+                      </span>
+                      <ImageDropUpload
+                        currentImage={storeSettings.specialtyImage}
+                        onImageChange={(val) => handleUpdateSetting("specialtyImage", val)}
+                        label="Foto de la Especialidad"
+                        aspectRatio="square"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-
-            {isAdminLogged && !isAdminPreviewMode ? (
-              <div className="flex items-center gap-2 bg-black/45 border border-white/10 rounded-xl px-3 py-2">
-                <span className="text-xs text-gray-400 font-mono">Boton Especialidad:</span>
-                <input
-                  type="text"
-                  value={storeSettings.specialtyButtonText || "Agregar al plato"}
-                  onChange={(e) => handleUpdateSetting("specialtyButtonText", e.target.value)}
-                  className="bg-transparent text-white focus:outline-none text-xs font-bold font-sans"
-                  placeholder="Agregar al plato"
-                />
-              </div>
-            ) : (
-              <button
-                id="btn-specialty-add-to-cart"
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleAddSpecialtyToCart();
-                }}
-                style={{ backgroundColor: "var(--color-primary)" }}
-                className="px-6 py-3 rounded-xl font-display font-bold text-sm text-white hover:opacity-90 transform active:scale-95 transition-all flex items-center gap-2 cursor-pointer shadow-lg shadow-primary/20"
-              >
-                <ShoppingBag className="w-4 h-4 shrink-0" />
-                <span>{storeSettings.specialtyButtonText || "Agregar al plato"}</span>
-              </button>
-            )}
-          </div>
-
-          {/* Photo & Custom Photo Editor */}
-          <div className="space-y-3">
-            <div className="relative rounded-2xl overflow-hidden aspect-square border border-white/10 shadow-2xl shadow-black group">
-              <img
-                src={storeSettings.specialtyImage || mofongoImage}
-                alt="Mofongo Monte Pork"
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover transform duration-500 hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none"></div>
-              
-              <div className="absolute bottom-4 left-4 right-4 z-10 pointer-events-auto">
-                {isAdminLogged && !isAdminPreviewMode ? (
-                  <div className="space-y-1 bg-black/70 backdrop-blur-md p-2 rounded-xl border border-white/10">
-                    <input
-                      type="text"
-                      value={storeSettings.specialtyPhotoBadge || "Foto real de cocina"}
-                      onChange={(e) => handleUpdateSetting("specialtyPhotoBadge", e.target.value)}
-                      className="text-[10px] font-display font-medium text-primary uppercase tracking-wider block bg-transparent focus:outline-none w-full"
-                      placeholder="Etiqueta (ej: Foto real de cocina)"
-                    />
-                    <input
-                      type="text"
-                      value={storeSettings.specialtyPhotoCaption || "El Mofongo MP recién salido del pilón"}
-                      onChange={(e) => handleUpdateSetting("specialtyPhotoCaption", e.target.value)}
-                      className="text-xs font-bold text-white block bg-transparent focus:outline-none w-full"
-                      placeholder="Pie de foto"
-                    />
-                  </div>
-                ) : (
-                  <>
-                    <span className="text-xs font-display font-medium text-gray-400 uppercase tracking-wider block">
-                      {storeSettings.specialtyPhotoBadge || "Foto real de cocina"}
-                    </span>
-                    <span className="text-sm font-bold text-white">
-                      {storeSettings.specialtyPhotoCaption || "El Mofongo MP recién salido del pilón"}
-                    </span>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* In Admin Mode: Photo Uploader / Replacer */}
-            {isAdminLogged && !isAdminPreviewMode && (
-              <div className="bg-black/60 border border-white/10 rounded-2xl p-3">
-                <span className="text-[10px] uppercase font-bold text-gray-400 block mb-1.5">
-                  Cambiar / Sustituir Foto de la Especialidad (.png o .jpg)
-                </span>
-                <ImageDropUpload
-                  currentImage={storeSettings.specialtyImage}
-                  onImageChange={(val) => handleUpdateSetting("specialtyImage", val)}
-                  label="Foto de la Especialidad"
-                  aspectRatio="square"
-                />
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
+          </section>
+        );
+      })()}
 
       {/* Sticky Top Menu Navigator & Search Bar wrapper */}
       <div id="sticky-header" className="sticky top-0 bg-dark-bg/95 backdrop-blur-lg border-b border-white/5 z-30 shadow-md">
@@ -2433,9 +2960,9 @@ export default function App() {
               <Search className="w-8 h-8" />
             </div>
             <div>
-              <h4 className="font-display font-medium text-lg text-white">No encontramos ningún "crujido" similar</h4>
+              <h4 className="font-display font-medium text-lg text-white">No encontramos resultados</h4>
               <p className="text-sm text-gray-400 mt-1 max-w-md mx-auto">
-                No hay resultados para "{searchQuery}". Intenta con otros términos como chicharrón, tocino, mofongo o Presidente.
+                No hay resultados para "{searchQuery}". Intenta con otros términos como chocolate, nutella, red velvet o six pack.
               </p>
             </div>
             <button

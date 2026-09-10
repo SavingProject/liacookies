@@ -1,6 +1,6 @@
 {
-  "name": "Monte Pork",
-  "description": "Menú digital interactivo y crujiente de Monte Pork",
+  "name": "Lia Cookies",
+  "description": "Menú digital interactivo de Lia Cookies - Dulce Experiencia de Sabores",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

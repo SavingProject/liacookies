@@ -19,60 +19,169 @@ async function startServer() {
   const SRC_CONFIG_FILE = path.join(process.cwd(), "src", "store_config.json");
   const DATA_DIR = path.join(process.cwd(), "data");
   const DATA_CONFIG_FILE = path.join(DATA_DIR, "store_config.json");
+  const USER_PERSISTENT_FILE = path.join(DATA_DIR, "user_saved_config.json");
+  const BACKUPS_DIR = path.join(DATA_DIR, "backups");
 
-  // Ensure data directory exists
-  if (!fs.existsSync(DATA_DIR)) {
-    try {
+  // Ensure data and backup directories exist
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
-    } catch (e) {
-      console.warn("Could not create data dir (read-only environment):", e);
     }
+    if (!fs.existsSync(BACKUPS_DIR)) {
+      fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+    }
+  } catch (e) {
+    console.warn("Could not create data/backups dir (read-only environment):", e);
   }
 
-  // Get current configuration
+  // Get current configuration with smart timestamp / newest version resolution
   app.get("/api/config", (req, res) => {
     try {
-      if (fs.existsSync(SRC_CONFIG_FILE)) {
-        const fileContent = fs.readFileSync(SRC_CONFIG_FILE, "utf-8");
-        const parsed = JSON.parse(fileContent);
-        return res.json({ found: true, ...parsed });
-      } else if (fs.existsSync(DATA_CONFIG_FILE)) {
-        const fileContent = fs.readFileSync(DATA_CONFIG_FILE, "utf-8");
-        const parsed = JSON.parse(fileContent);
-        return res.json({ found: true, ...parsed });
-      } else {
-        return res.json({ found: false });
+      const candidates = [USER_PERSISTENT_FILE, DATA_CONFIG_FILE, SRC_CONFIG_FILE];
+      let bestCandidate: { data: any; updatedAt: number; source: string } | null = null;
+
+      for (const filePath of candidates) {
+        if (fs.existsSync(filePath)) {
+          try {
+            const content = fs.readFileSync(filePath, "utf-8");
+            const parsed = JSON.parse(content);
+            const mtime = fs.statSync(filePath).mtimeMs;
+            const itemUpdatedAt = typeof parsed.updatedAt === "number" ? parsed.updatedAt : Math.floor(mtime);
+
+            if (!bestCandidate || itemUpdatedAt > bestCandidate.updatedAt) {
+              bestCandidate = {
+                data: parsed,
+                updatedAt: itemUpdatedAt,
+                source: path.basename(filePath)
+              };
+            }
+          } catch (err) {
+            console.warn(`Could not parse config from ${filePath}:`, err);
+          }
+        }
       }
+
+      if (bestCandidate) {
+        return res.json({
+          found: true,
+          ...bestCandidate.data,
+          updatedAt: bestCandidate.updatedAt,
+          _source: bestCandidate.source
+        });
+      }
+
+      return res.json({ found: false });
     } catch (error) {
       console.error("Error reading config from disk:", error);
       res.status(500).json({ error: "Failed to read configuration from disk." });
     }
   });
 
-  // Save current configuration to disk files
+  // Helper function to update HTML meta tags in file
+  const updateHtmlMetaInFile = (filePath: string, settings: any) => {
+    try {
+      if (!fs.existsSync(filePath)) return;
+      let html = fs.readFileSync(filePath, "utf-8");
+
+      const heroTitle = settings.heroTitle || "Lia Cookies";
+      const heroSubtitle = settings.heroSubtitle || "Dulce Experiencia de Sabores";
+      const heroDescription =
+        settings.heroDescription ||
+        "Gourmet Stuffed Cookies & Bakery. Galletas artesanales rellenas, six packs y experiencias dulces inolvidables.";
+      const fullTitle =
+        settings.tabTitle && settings.tabTitle.trim() !== ""
+          ? settings.tabTitle
+          : `${heroTitle} | ${heroSubtitle}`;
+
+      html = html.replace(/<title>(.*?)<\/title>/i, `<title>${fullTitle}</title>`);
+      html = html.replace(/<meta\s+name="title"\s+content="[^"]*"\s*\/?>/i, `<meta name="title" content="${fullTitle}" />`);
+      html = html.replace(/<meta\s+name="description"\s+content="[^"]*"\s*\/?>/i, `<meta name="description" content="${heroDescription}" />`);
+      html = html.replace(/<meta\s+property="og:title"\s+content="[^"]*"\s*\/?>/i, `<meta property="og:title" content="${fullTitle}" />`);
+      html = html.replace(/<meta\s+property="og:description"\s+content="[^"]*"\s*\/?>/i, `<meta property="og:description" content="${heroDescription}" />`);
+      html = html.replace(/<meta\s+property="og:site_name"\s+content="[^"]*"\s*\/?>/i, `<meta property="og:site_name" content="${heroTitle}" />`);
+      html = html.replace(/<meta\s+name="twitter:title"\s+content="[^"]*"\s*\/?>/i, `<meta name="twitter:title" content="${fullTitle}" />`);
+      html = html.replace(/<meta\s+name="twitter:description"\s+content="[^"]*"\s*\/?>/i, `<meta name="twitter:description" content="${heroDescription}" />`);
+
+      fs.writeFileSync(filePath, html, "utf-8");
+    } catch (e) {
+      console.warn(`Could not update HTML metadata in ${filePath}:`, e);
+    }
+  };
+
+  // Save current configuration to disk files & create safe snapshot backups
   app.post("/api/config", (req, res) => {
     try {
       const data = req.body;
-      const jsonString = JSON.stringify(data, null, 2);
+      const now = Date.now();
+      const payloadWithTimestamp = {
+        ...data,
+        updatedAt: data.updatedAt || now
+      };
+      const jsonString = JSON.stringify(payloadWithTimestamp, null, 2);
 
-      // Save directly into src/ for static Vercel build and git persistence
+      // 1. Save directly into persistent user configuration file in data/
+      try {
+        if (!fs.existsSync(DATA_DIR)) {
+          fs.mkdirSync(DATA_DIR, { recursive: true });
+        }
+        fs.writeFileSync(USER_PERSISTENT_FILE, jsonString, "utf-8");
+        fs.writeFileSync(DATA_CONFIG_FILE, jsonString, "utf-8");
+      } catch (err) {
+        console.warn("Warning writing to persistent data files:", err);
+      }
+
+      // 2. Save into src/ for static Vercel build and git persistence
       try {
         fs.writeFileSync(SRC_CONFIG_FILE, jsonString, "utf-8");
       } catch (err) {
         console.warn("Warning writing to SRC_CONFIG_FILE:", err);
       }
 
-      // Save into data/ directory as backup
+      // 3. Keep a rotating historical backup in data/backups/
       try {
-        if (!fs.existsSync(DATA_DIR)) {
-          fs.mkdirSync(DATA_DIR, { recursive: true });
+        if (!fs.existsSync(BACKUPS_DIR)) {
+          fs.mkdirSync(BACKUPS_DIR, { recursive: true });
         }
-        fs.writeFileSync(DATA_CONFIG_FILE, jsonString, "utf-8");
+        const backupFile = path.join(BACKUPS_DIR, `config_backup_${now}.json`);
+        fs.writeFileSync(backupFile, jsonString, "utf-8");
+
+        // Keep maximum 10 latest backup files
+        const backupFiles = fs
+          .readdirSync(BACKUPS_DIR)
+          .filter((f) => f.startsWith("config_backup_") && f.endsWith(".json"))
+          .map((f) => ({
+            name: f,
+            path: path.join(BACKUPS_DIR, f),
+            time: fs.statSync(path.join(BACKUPS_DIR, f)).mtimeMs
+          }))
+          .sort((a, b) => b.time - a.time);
+
+        if (backupFiles.length > 10) {
+          for (const old of backupFiles.slice(10)) {
+            try {
+              fs.unlinkSync(old.path);
+            } catch (e) {
+              // Ignore unlink errors
+            }
+          }
+        }
       } catch (err) {
-        console.warn("Warning writing to DATA_CONFIG_FILE:", err);
+        console.warn("Warning creating timestamped backup file:", err);
       }
 
-      res.json({ success: true, message: "Configuration successfully saved to disk." });
+      // 4. Synchronize index.html and dist/index.html with new meta tags
+      if (data.storeSettings) {
+        const rootIndexHtml = path.join(process.cwd(), "index.html");
+        const distIndexHtml = path.join(process.cwd(), "dist", "index.html");
+        updateHtmlMetaInFile(rootIndexHtml, data.storeSettings);
+        updateHtmlMetaInFile(distIndexHtml, data.storeSettings);
+      }
+
+      res.json({
+        success: true,
+        updatedAt: payloadWithTimestamp.updatedAt,
+        message: "Configuration successfully saved to disk and backed up."
+      });
     } catch (error) {
       console.error("Error writing config to disk:", error);
       res.status(500).json({ error: "Failed to save configuration." });

@@ -7,7 +7,7 @@ interface LogoProps {
   size?: "sm" | "md" | "lg" | "xl";
   light?: boolean;
   title?: string;
-  logoType?: "snout" | "image" | "emoji" | "none";
+  logoType?: "cookie" | "snout" | "image" | "emoji" | "none";
   logoValue?: string;
   titleDisplayType?: "text" | "image";
   titleImageUrl?: string;
@@ -17,9 +17,9 @@ interface LogoProps {
 export default function Logo({ 
   size = "md", 
   light = false, 
-  title = "MONTE PORK",
-  logoType = "snout",
-  logoValue = "",
+  title = "Lia Cookies",
+  logoType = "emoji",
+  logoValue = "🍪",
   titleDisplayType = "text",
   titleImageUrl = "",
   titleImageWidth = 320,
@@ -63,10 +63,10 @@ export default function Logo({
   };
 
   const emojiSizes = {
-    sm: "text-xs",
-    md: "text-base",
-    lg: "text-xl md:text-2xl",
-    xl: "text-3xl md:text-4xl lg:text-5xl",
+    sm: "text-sm",
+    md: "text-xl",
+    lg: "text-2xl md:text-3xl",
+    xl: "text-4xl md:text-5xl lg:text-6xl",
   };
 
   // Dynamically build the brand logo with snout/icon replacing the first 'O' and fuchsia highlighting the last word
@@ -95,10 +95,8 @@ export default function Logo({
     textBeforeHighlight = textToProcess.substring(0, lastSpaceIdx);
     highlightedWord = textToProcess.substring(lastSpaceIdx + 1);
   } else if (!hasO) {
-    // If no space and no O, make the whole text normal or highlight
     textBeforeHighlight = textToProcess;
   } else {
-    // Has O but no space, so the part after O is the highlight
     textBeforeHighlight = "";
     highlightedWord = textToProcess;
   }
@@ -111,35 +109,48 @@ export default function Logo({
       {/* Text before O */}
       <span className="text-white">{partBeforeO}</span>
       
-      {/* Replacement for 'O' if present */}
+      {/* Replacement for 'O' with Cookie */}
+      {hasO && (logoType === "cookie" || (logoType === "emoji" && (logoValue === "🍪" || !logoValue))) && (
+        <span
+          className={`relative rounded-full bg-gradient-to-br from-amber-400 via-amber-600 to-amber-800 flex items-center justify-center shadow-lg transform transition-transform duration-300 hover:scale-110 border-white/80 shrink-0 ${noseSizes[size]}`}
+          style={{ boxShadow: "0 0 16px rgba(251, 191, 36, 0.45)" }}
+        >
+          {/* Chocolate chips */}
+          <span className="absolute top-[22%] left-[28%] w-[18%] h-[18%] bg-[#261005] rounded-full shadow-inner"></span>
+          <span className="absolute top-[32%] right-[22%] w-[20%] h-[20%] bg-[#261005] rounded-full shadow-inner"></span>
+          <span className="absolute bottom-[24%] left-[34%] w-[22%] h-[22%] bg-[#261005] rounded-full shadow-inner"></span>
+          <span className="absolute bottom-[36%] right-[32%] w-[14%] h-[14%] bg-[#261005] rounded-full shadow-inner"></span>
+        </span>
+      )}
+
+      {/* Replacement for 'O' if pig snout requested */}
       {hasO && logoType === "snout" && (
         <span
-          style={{ backgroundColor: "var(--color-primary, #E8005A)" }}
+          style={{ backgroundColor: "var(--color-primary, #8A1C9E)" }}
           className={`relative rounded-full flex items-center justify-center shadow-lg transform transition-transform duration-300 hover:scale-110 logo-pig-nose-glow border-white shrink-0 ${noseSizes[size]}`}
         >
-          {/* Nostrils */}
           <span className="absolute left-[32%] w-[12%] h-[28%] bg-black rounded-full transform rotate-3 shadow-inner"></span>
           <span className="absolute right-[32%] w-[12%] h-[28%] bg-black rounded-full transform -rotate-3 shadow-inner"></span>
-          
-          {/* Snout bottom smile accent */}
           <span className="absolute bottom-[20%] w-[25%] h-[8%] bg-black/10 rounded-full"></span>
         </span>
       )}
 
-      {hasO && logoType === "emoji" && (
+      {/* Replacement for 'O' with custom Emoji */}
+      {hasO && logoType === "emoji" && logoValue && logoValue !== "🍪" && (
         <span
-          className={`relative rounded-full flex items-center justify-center bg-black/40 shadow-lg transform transition-transform duration-300 hover:scale-110 logo-pig-nose-glow border-white shrink-0 ${noseSizes[size]}`}
+          className={`relative rounded-full flex items-center justify-center bg-black/40 shadow-lg transform transition-transform duration-300 hover:scale-110 border-white shrink-0 ${noseSizes[size]}`}
         >
-          <span className={`select-none leading-none ${emojiSizes[size]}`}>{logoValue || "🐷"}</span>
+          <span className={`select-none leading-none ${emojiSizes[size]}`}>{logoValue}</span>
         </span>
       )}
 
+      {/* Replacement for 'O' with Image */}
       {hasO && logoType === "image" && (
         <img
-          src={logoValue || "https://images.unsplash.com/photo-1516467508483-a7212febe31a?w=120"}
+          src={logoValue || "/src/assets/images/lia_six_pack_box_1788791837137.jpg"}
           alt="Custom Logo"
           referrerPolicy="no-referrer"
-          className={`rounded-full object-cover shadow-lg transform transition-transform duration-300 hover:scale-110 logo-pig-nose-glow border-white shrink-0 ${noseSizes[size]}`}
+          className={`rounded-full object-cover shadow-lg transform transition-transform duration-300 hover:scale-110 border-white shrink-0 ${noseSizes[size]}`}
         />
       )}
 
@@ -151,10 +162,10 @@ export default function Logo({
       {/* Highlighted Suffix */}
       {highlightedWord && (
         <span 
-          className="text-primary font-extrabold uppercase ml-1 animate-pulse" 
+          className="text-primary font-extrabold uppercase ml-1" 
           style={{ 
-            color: "var(--color-primary, #E8005A)",
-            textShadow: "0 0 10px var(--color-primary, rgba(232, 0, 90, 0.4))"
+            color: "var(--color-primary, #8A1C9E)",
+            textShadow: "0 0 16px var(--color-primary, rgba(138, 28, 158, 0.6))"
           }}
         >
           {highlightedWord}
