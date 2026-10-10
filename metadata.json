@@ -1,6 +1,6 @@
 {
   "name": "Lia Cookies",
   "description": "Menú digital interactivo de Lia Cookies - Dulce Experiencia de Sabores",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["geolocation"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

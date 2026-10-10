@@ -143,7 +143,10 @@ export const STORE_SETTINGS = storeConfig?.storeSettings || {
   backgroundGradientPreset: "morado_noir",
   backgroundGradientColor1: "#320645",
   backgroundGradientColor2: "#14031E",
-  backgroundGradientDirection: "to bottom"
+  backgroundGradientDirection: "to bottom",
+  instagramMode: true,
+  instagramDmUrl: "https://ig.me/m/liacookies70",
+  instagramHandle: "liacookies70"
 };
 
 export const ADMIN_PASSWORD_HASH = storeConfig?.adminPasswordHash || "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4";

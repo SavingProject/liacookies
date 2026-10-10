@@ -1112,6 +1112,23 @@ export default function App() {
             </button>
 
             <button
+              onClick={() => {
+                const nextMode = !storeSettings.instagramMode;
+                handleUpdateSetting("instagramMode", nextMode);
+                showToast(nextMode ? "📸 Modo Instagram ACTIVADO (Pedidos y chat por Instagram DM)" : "🟢 Modo WhatsApp ACTIVADO");
+              }}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                storeSettings.instagramMode !== false
+                  ? "bg-gradient-to-r from-purple-600/25 to-pink-600/25 text-pink-300 border-pink-500/40 hover:from-purple-600/35 hover:to-pink-600/35 shadow-sm shadow-pink-500/20"
+                  : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20"
+              }`}
+              title="Alternar entre recibir pedidos por WhatsApp o por Instagram DM"
+            >
+              <Instagram className="w-3.5 h-3.5 text-pink-400" />
+              <span>{storeSettings.instagramMode !== false ? "📸 Modo Instagram: ACTIVO" : "🟢 Modo WhatsApp"}</span>
+            </button>
+
+            <button
               onClick={() => setShowChangePassModal(true)}
               className="px-3 py-1.5 bg-white/5 border border-white/10 hover:bg-white/10 text-gray-300 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
             >
@@ -1798,6 +1815,69 @@ export default function App() {
                 </p>
               </div>
 
+              {/* Instagram Mode Settings Section */}
+              <div className="space-y-3 bg-gradient-to-br from-pink-950/20 via-purple-950/25 to-black/40 border border-pink-500/30 rounded-2xl p-4 animate-fadeIn">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase text-pink-300 font-bold tracking-wider flex items-center gap-1.5">
+                    <Instagram className="w-3.5 h-3.5 text-pink-400" />
+                    <span>Modo Instagram (Chat y Pedidos vía DM)</span>
+                  </span>
+                  
+                  <div className="flex items-center gap-1 bg-black/60 p-1 rounded-xl border border-white/10 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleUpdateSetting("instagramMode", true);
+                        showToast("📸 Modo Instagram Activado");
+                      }}
+                      className={`px-3 py-1 rounded-lg font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                        storeSettings.instagramMode !== false
+                          ? "bg-gradient-to-r from-purple-600 via-pink-600 to-rose-500 text-white shadow-md shadow-pink-500/30"
+                          : "text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      <Check className="w-3 h-3" />
+                      <span>Activo</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleUpdateSetting("instagramMode", false);
+                        showToast("🟢 Modo WhatsApp Activado");
+                      }}
+                      className={`px-3 py-1 rounded-lg font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                        storeSettings.instagramMode === false
+                          ? "bg-emerald-600 text-white shadow-md shadow-emerald-500/30"
+                          : "text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      <Phone className="w-3 h-3" />
+                      <span>WhatsApp</span>
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-gray-300 font-light leading-relaxed">
+                  {storeSettings.instagramMode !== false
+                    ? "✨ Modo Instagram ACTIVO: Se oculta completamente el número de WhatsApp y el botón de WhatsApp. Al hacer clic en 'Pedir por Instagram' o en el botón de chat, el pedido se copia al portapapeles y se abre directamente el DM de Instagram para enviarlo."
+                    : "🟢 Modo WhatsApp ACTIVO: Los pedidos y contactos se procesan a través de WhatsApp."}
+                </p>
+
+                <div className="space-y-1.5 pt-1">
+                  <label className="text-[10px] uppercase text-pink-300 font-bold block flex items-center justify-between">
+                    <span>Enlace directo al DM de Instagram:</span>
+                    <span className="text-[9px] text-gray-400 font-mono">ig.me</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={storeSettings.instagramDmUrl || "https://ig.me/m/liacookies70"}
+                    onChange={(e) => handleUpdateSetting("instagramDmUrl", e.target.value)}
+                    className="w-full bg-black/50 border border-pink-500/30 rounded-xl px-3.5 py-2 text-xs font-mono text-pink-200 focus:outline-none focus:border-pink-400"
+                    placeholder="https://ig.me/m/liacookies70"
+                  />
+                </div>
+              </div>
+
               {/* Browser Tab Title Customization */}
               <div className="space-y-2 bg-black/40 border border-white/10 rounded-2xl p-4 animate-fadeIn">
                 <div className="flex items-center justify-between">
@@ -2319,16 +2399,23 @@ export default function App() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-xs font-mono font-medium text-gray-400 py-3 px-4 bg-white/5 border border-white/5 rounded-2xl max-w-md mx-auto backdrop-blur-md">
             {isAdminLogged && !isAdminPreviewMode ? (
               <div className="flex flex-col gap-2 w-full">
-                <span className="text-[10px] text-gray-500 uppercase tracking-widest font-bold text-center">Ajustes de Contacto</span>
+                <div className="flex items-center justify-between text-[10px] text-gray-500 uppercase tracking-widest font-bold">
+                  <span>Ajustes de Contacto</span>
+                  {storeSettings.instagramMode !== false && (
+                    <span className="text-pink-400 font-bold lowercase bg-pink-500/10 px-2 py-0.5 rounded-md border border-pink-500/20">
+                      📸 modo instagram activo
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 bg-black/35 border border-white/10 rounded-xl px-3 py-1.5 w-full">
-                  <Instagram className="w-4 h-4 text-primary shrink-0" />
+                  <Instagram className="w-4 h-4 text-pink-400 shrink-0" />
                   <span className="text-gray-500">instagram.com/</span>
                   <input
                     type="text"
                     value={contactInfo.instagram}
                     onChange={(e) => handleUpdateContactInfo("instagram", e.target.value)}
                     className="bg-transparent text-gray-200 focus:outline-none w-full font-sans text-xs"
-                    placeholder="monteporkrd"
+                    placeholder="Liacookies70"
                   />
                 </div>
                 <div className="flex items-center gap-2 bg-black/35 border border-white/10 rounded-xl px-3 py-1.5 w-full">
@@ -2346,24 +2433,28 @@ export default function App() {
             ) : (
               <>
                 <a
-                  href={`https://instagram.com/${contactInfo.instagram}`}
+                  href={storeSettings.instagramDmUrl || `https://instagram.com/${contactInfo.instagram}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center gap-1 hover:text-primary transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 hover:text-pink-400 transition-colors cursor-pointer"
                 >
-                  <Instagram className="w-4 h-4 text-primary" />
+                  <Instagram className="w-4 h-4 text-pink-400" />
                   <span>@{contactInfo.instagram}</span>
                 </a>
-                <span className="text-white/20 hidden sm:inline">|</span>
-                <a
-                  href={`https://wa.me/${contactInfo.phone}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-1 hover:text-primary transition-colors cursor-pointer"
-                >
-                  <Phone className="w-4 h-4 text-emerald-400" />
-                  <span>+{contactInfo.phone}</span>
-                </a>
+                {storeSettings.instagramMode === false && (
+                  <>
+                    <span className="text-white/20 hidden sm:inline">|</span>
+                    <a
+                      href={`https://wa.me/${contactInfo.phone}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1 hover:text-emerald-400 transition-colors cursor-pointer"
+                    >
+                      <Phone className="w-4 h-4 text-emerald-400" />
+                      <span>+{contactInfo.phone}</span>
+                    </a>
+                  </>
+                )}
               </>
             )}
           </div>
@@ -2380,7 +2471,7 @@ export default function App() {
                     value={storeSettings.heroButton1Text}
                     onChange={(e) => handleUpdateSetting("heroButton1Text", e.target.value)}
                     className="bg-transparent text-white focus:outline-none w-full text-xs font-bold font-display"
-                    placeholder="Ver Menú"
+                    placeholder="Ver Menú Dulce"
                   />
                 </div>
                 <div className="flex items-center gap-2 bg-black/45 border border-white/10 rounded-xl px-3 py-2 w-full">
@@ -2390,7 +2481,7 @@ export default function App() {
                     value={storeSettings.heroButton2Text}
                     onChange={(e) => handleUpdateSetting("heroButton2Text", e.target.value)}
                     className="bg-transparent text-white focus:outline-none w-full text-xs font-bold font-display"
-                    placeholder="Escríbenos"
+                    placeholder="Pedir por Instagram"
                   />
                 </div>
               </div>
@@ -2402,18 +2493,34 @@ export default function App() {
                   className="w-full sm:w-auto px-10 py-4 rounded-2xl font-display font-black text-white tracking-wide uppercase shadow-lg shadow-primary/30 transform transition-all duration-300 hover:scale-105 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <UtensilsCrossed className="w-5 h-5 shrink-0" />
-                  <span>{storeSettings.heroButton1Text}</span>
+                  <span>{storeSettings.heroButton1Text || "Ver Menú Dulce"}</span>
                 </button>
 
-                <a
-                  href={`https://wa.me/${contactInfo.phone}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="w-full sm:w-auto px-10 py-4 bg-white/10 hover:bg-white/15 backdrop-blur-md text-white font-display font-black tracking-wide uppercase border border-white/10 rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <MessageCircle className="w-5 h-5 shrink-0 text-emerald-400 fill-emerald-400/10" />
-                  <span>{storeSettings.heroButton2Text}</span>
-                </a>
+                {storeSettings.instagramMode !== false ? (
+                  <a
+                    href={storeSettings.instagramDmUrl || "https://ig.me/m/liacookies70"}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-purple-900/40 via-pink-900/40 to-rose-900/40 hover:from-purple-900/60 hover:via-pink-900/60 hover:to-rose-900/60 backdrop-blur-md text-white font-display font-black tracking-wide uppercase border border-pink-500/30 hover:border-pink-400/50 rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-pink-500/10"
+                  >
+                    <Instagram className="w-5 h-5 shrink-0 text-pink-400" />
+                    <span>
+                      {storeSettings.heroButton2Text === "Pedir por WhatsApp"
+                        ? "Pedir por Instagram"
+                        : (storeSettings.heroButton2Text || "Pedir por Instagram")}
+                    </span>
+                  </a>
+                ) : (
+                  <a
+                    href={`https://wa.me/${contactInfo.phone}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full sm:w-auto px-10 py-4 bg-white/10 hover:bg-white/15 backdrop-blur-md text-white font-display font-black tracking-wide uppercase border border-white/10 rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <MessageCircle className="w-5 h-5 shrink-0 text-emerald-400 fill-emerald-400/10" />
+                    <span>{storeSettings.heroButton2Text || "Pedir por WhatsApp"}</span>
+                  </a>
+                )}
               </>
             )}
           </div>
@@ -3218,20 +3325,28 @@ export default function App() {
         </div>
       )}
 
-      {/* Sticky Floating WhatsApp Help widget on bottom-right */}
+      {/* Sticky Floating Chat / Help widget on bottom-right */}
       {totalCartCount === 0 && (
         <a
-          id="whatsapp-floating-ball"
-          href={`https://wa.me/${contactInfo.phone}`}
+          id={storeSettings.instagramMode !== false ? "instagram-floating-ball" : "whatsapp-floating-ball"}
+          href={storeSettings.instagramMode !== false ? (storeSettings.instagramDmUrl || "https://ig.me/m/liacookies70") : `https://wa.me/${contactInfo.phone}`}
           target="_blank"
           rel="noreferrer"
-          className="fixed bottom-6 right-6 z-40 bg-emerald-500 text-white p-4 rounded-full flex items-center justify-center shadow-lg hover:bg-emerald-600 transition-all duration-300 hover:scale-110 active:scale-90 cursor-pointer shadow-emerald-500/20 group"
+          className={`fixed bottom-6 right-6 z-40 text-white p-4 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 hover:scale-110 active:scale-90 cursor-pointer group ${
+            storeSettings.instagramMode !== false
+              ? "bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] shadow-pink-500/30 hover:shadow-pink-500/50"
+              : "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20"
+          }`}
         >
           {/* Chat Bubble Help effect */}
-          <span className="absolute right-14 bg-black/90 text-white border border-white/5 text-[10px] font-display font-bold px-3 py-1.5 rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none">
-            ¡Dime de qué tienes deseos! 👋
+          <span className="absolute right-14 bg-black/90 text-white border border-white/10 text-[10px] font-display font-bold px-3 py-1.5 rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none shadow-xl backdrop-blur-md">
+            {storeSettings.instagramMode !== false ? "¡Escríbenos por Instagram DM! 💬✨" : "¡Dime de qué tienes deseos! 👋"}
           </span>
-          <MessageCircle className="w-6 h-6 fill-white text-emerald-500" />
+          {storeSettings.instagramMode !== false ? (
+            <Instagram className="w-6 h-6 text-white" />
+          ) : (
+            <MessageCircle className="w-6 h-6 fill-white text-emerald-500" />
+          )}
         </a>
       )}
 
@@ -3247,6 +3362,9 @@ export default function App() {
         whatsappPhone={contactInfo.phone}
         storeName={storeSettings.heroTitle}
         storeSubtitle={storeSettings.heroSubtitle}
+        instagramMode={storeSettings.instagramMode !== false}
+        instagramDmUrl={storeSettings.instagramDmUrl || "https://ig.me/m/liacookies70"}
+        onNotify={showToast}
       />
 
       {/* Brand Footer */}
@@ -3277,21 +3395,23 @@ export default function App() {
 
           <div className="flex items-center justify-center gap-6">
             <a
-              href={`https://instagram.com/${contactInfo.instagram}`}
+              href={storeSettings.instagramDmUrl || `https://instagram.com/${contactInfo.instagram}`}
               target="_blank"
               rel="noreferrer"
-              className="w-11 h-11 rounded-full bg-white/5 border border-white/5 flex items-center justify-center text-gray-400 hover:text-primary hover:border-primary/30 transition-all cursor-pointer"
+              className="w-11 h-11 rounded-full bg-white/5 border border-white/5 flex items-center justify-center text-gray-400 hover:text-pink-400 hover:border-pink-500/30 transition-all cursor-pointer"
             >
               <Instagram className="w-5 h-5" />
             </a>
-            <a
-              href={`https://wa.me/${contactInfo.phone}`}
-              target="_blank"
-              rel="noreferrer"
-              className="w-11 h-11 rounded-full bg-white/5 border border-white/5 flex items-center justify-center text-gray-400 hover:text-primary hover:border-primary/30 transition-all cursor-pointer"
-            >
-              <Phone className="w-5 h-5 text-emerald-400" />
-            </a>
+            {storeSettings.instagramMode === false && (
+              <a
+                href={`https://wa.me/${contactInfo.phone}`}
+                target="_blank"
+                rel="noreferrer"
+                className="w-11 h-11 rounded-full bg-white/5 border border-white/5 flex items-center justify-center text-gray-400 hover:text-emerald-400 hover:border-emerald-500/30 transition-all cursor-pointer"
+              >
+                <Phone className="w-5 h-5 text-emerald-400" />
+              </a>
+            )}
           </div>
         </div>
 

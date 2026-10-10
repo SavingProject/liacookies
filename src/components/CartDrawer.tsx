@@ -4,7 +4,7 @@
  */
 
 import { CartItem, MenuItem } from "../types";
-import { X, Trash2, MessageSquare, ShoppingBag, Plus, Minus, FileText } from "lucide-react";
+import { X, Trash2, MessageSquare, ShoppingBag, Plus, Minus, FileText, Instagram, Copy, Check, ExternalLink, Sparkles, CheckCircle2, MapPin, Loader2, Navigation } from "lucide-react";
 import { useState } from "react";
 
 interface CartDrawerProps {
@@ -18,7 +18,72 @@ interface CartDrawerProps {
   whatsappPhone?: string;
   storeName?: string;
   storeSubtitle?: string;
+  instagramMode?: boolean;
+  instagramDmUrl?: string;
+  onNotify?: (message: string) => void;
 }
+
+// Helper to construct Instagram DM link with pre-filled message text (?text=...)
+export const getInstagramDmUrlWithText = (baseDmUrl: string, messageText: string): string => {
+  let rawUrl = (baseDmUrl || "https://ig.me/m/liacookies70").trim();
+
+  // If user only provided handle e.g. "liacookies70" or "@liacookies70"
+  if (!rawUrl.startsWith("http://") && !rawUrl.startsWith("https://")) {
+    const handle = rawUrl.replace(/^@/, "").replace(/^instagram\.com\//, "");
+    rawUrl = `https://ig.me/m/${handle}`;
+  } else if (rawUrl.includes("instagram.com/") && !rawUrl.includes("/direct/")) {
+    // Convert regular profile link https://instagram.com/liacookies70 to https://ig.me/m/liacookies70
+    const parts = rawUrl.replace(/\/$/, "").split("/");
+    const handle = parts[parts.length - 1].replace(/^@/, "");
+    if (handle && handle !== "instagram.com") {
+      rawUrl = `https://ig.me/m/${handle}`;
+    }
+  }
+
+  // Strip existing ?text parameter if any
+  const cleanBase = rawUrl.split("?text=")[0].split("&text=")[0];
+  const separator = cleanBase.includes("?") ? "&" : "?";
+  return `${cleanBase}${separator}text=${encodeURIComponent(messageText)}`;
+};
+
+// Robust clipboard copy with multi-layer fallback for iframes, mobile Safari, iOS and Android
+const copyToClipboardRobust = (text: string): boolean => {
+  let copied = false;
+
+  // Layer 1: Synchronous textarea with execCommand (preserves user-gesture context for popups & works in iframes)
+  try {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.top = "0";
+    textarea.style.left = "0";
+    textarea.style.width = "2em";
+    textarea.style.height = "2em";
+    textarea.style.padding = "0";
+    textarea.style.border = "none";
+    textarea.style.outline = "none";
+    textarea.style.boxShadow = "none";
+    textarea.style.background = "transparent";
+    textarea.setAttribute("readonly", "");
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    textarea.setSelectionRange(0, 99999);
+    copied = document.execCommand("copy");
+    document.body.removeChild(textarea);
+  } catch (e) {
+    console.warn("execCommand fallback failed:", e);
+  }
+
+  // Layer 2: Modern Clipboard API
+  if (navigator?.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).catch((err) => {
+      console.warn("navigator.clipboard.writeText failed:", err);
+    });
+  }
+
+  return copied;
+};
 
 export default function CartDrawer({
   isOpen,
@@ -29,35 +94,175 @@ export default function CartDrawer({
   onClearCart,
   onUpdateNotes,
   whatsappPhone = "18498140019",
-  storeName = "MONTE PORK",
-  storeSubtitle = "El Más Crujiente de la Región",
+  storeName = "Lia Cookies",
+  storeSubtitle = "Dulce Experiencia de Sabores",
+  instagramMode = true,
+  instagramDmUrl = "https://ig.me/m/liacookies70",
+  onNotify,
 }: CartDrawerProps) {
   const [customerName, setCustomerName] = useState("");
   const [deliveryMethod, setDeliveryMethod] = useState<"delivery" | "takeout" | "table">("delivery");
   const [tableNumber, setTableNumber] = useState("");
   const [address, setAddress] = useState("");
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [errors, setErrors] = useState<{ customerName?: boolean; address?: boolean }>({});
+  const [isCopied, setIsCopied] = useState(false);
+  const [showInstagramSuccessModal, setShowInstagramSuccessModal] = useState(false);
+  const [copiedOrderText, setCopiedOrderText] = useState("");
+
+  const handleGetLocation = () => {
+    setIsGettingLocation(true);
+    if (onNotify) {
+      onNotify("📍 Obteniendo tu ubicación actual...");
+    }
+
+    const processCoordinates = async (lat: number, lng: number, isApproximate = false) => {
+      const mapsUrl = `https://maps.google.com/?q=${lat.toFixed(6)},${lng.toFixed(6)}`;
+      let locationText = mapsUrl;
+
+      // Try fast reverse geocode (BigDataCloud client-side, CORS-friendly, Spanish support)
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
+        const res = await fetch(
+          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=es`,
+          { signal: controller.signal }
+        );
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          const placeNames = [
+            data.locality || data.city || data.principalSubdivision,
+            data.countryName,
+          ].filter(Boolean);
+          if (placeNames.length > 0) {
+            locationText = `${placeNames.join(", ")} (${mapsUrl})`;
+          }
+        }
+      } catch {
+        // Try fallback to Nominatim
+        try {
+          const controller2 = new AbortController();
+          const timeoutId2 = setTimeout(() => controller2.abort(), 2000);
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+            { signal: controller2.signal }
+          );
+          clearTimeout(timeoutId2);
+          if (response.ok) {
+            const data = await response.json();
+            if (data && data.display_name) {
+              locationText = `${data.display_name} (${mapsUrl})`;
+            }
+          }
+        } catch {
+          locationText = mapsUrl;
+        }
+      }
+
+      setAddress((prev) => {
+        if (prev.trim() && !prev.includes("maps.google.com")) {
+          return `${prev.trim()} - 📍 ${locationText}`;
+        }
+        return locationText;
+      });
+
+      setErrors((prev) => ({ ...prev, address: false }));
+      setIsGettingLocation(false);
+
+      if (onNotify) {
+        onNotify(isApproximate ? "📍 ¡Ubicación aproximada pegada en Dirección de Envío!" : "📍 ¡Ubicación actual pegada en Dirección de Envío!");
+      }
+    };
+
+    const tryIpFallback = async (originalErrorMsg?: string) => {
+      try {
+        const res = await fetch("https://ipapi.co/json/");
+        if (res.ok) {
+          const data = await res.json();
+          if (data && typeof data.latitude === "number" && typeof data.longitude === "number") {
+            await processCoordinates(data.latitude, data.longitude, true);
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn("IP Geolocation fallback failed:", e);
+      }
+
+      setIsGettingLocation(false);
+      if (onNotify) {
+        onNotify(originalErrorMsg || "⚠️ No pudimos obtener tu ubicación automáticamente. Por favor escribe tu dirección.");
+      }
+    };
+
+    if (!navigator.geolocation) {
+      tryIpFallback("⚠️ La geolocalización directa no está disponible en este navegador.");
+      return;
+    }
+
+    // Step 1: Try GPS with high accuracy (phone/tablet GPS)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        processCoordinates(pos.coords.latitude, pos.coords.longitude);
+      },
+      (err) => {
+        console.warn("High-accuracy GPS failed on mobile/browser, trying low-accuracy Wi-Fi/cellular:", err);
+
+        // Step 2: Try low accuracy (Wi-Fi / cellular network positioning)
+        navigator.geolocation.getCurrentPosition(
+          (pos2) => {
+            processCoordinates(pos2.coords.latitude, pos2.coords.longitude);
+          },
+          (err2) => {
+            console.warn("Low accuracy GPS also failed, attempting IP-based fallback:", err2);
+            let userMsg = "⚠️ No pudimos obtener la señal de ubicación. Por favor escribe tu dirección.";
+            if (err.code === 1 || err2.code === 1) {
+              userMsg = "⚠️ Permiso de ubicación no concedido en el navegador móvil. Activa los permisos de ubicación o escribe tu dirección.";
+            }
+            tryIpFallback(userMsg);
+          },
+          { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+        );
+      },
+      { enableHighAccuracy: true, timeout: 6000, maximumAge: 30000 }
+    );
+  };
 
   const subtotal = cart.reduce((acc, item) => acc + item.item.price * item.quantity, 0);
 
-  // Available side dishes for selecting if needed
-  const guarnicionesDisponibles = [
-    "Yuca en Mojo",
-    "Yuca Frita",
-    "Tostones al Ajillo",
-    "Papas Fritas",
-    "Casabe tostado",
-    "Batata Frita"
-  ];
-
-  // Pool of cookie and dessert emojis for WhatsApp messaging
+  // Pool of cookie and dessert emojis for messaging
   const DESSERT_COOKIE_EMOJIS = ["🍪", "🧁", "🍰", "🍩", "🍮", "🍫", "🧇", "🥮", "🍨", "🍧", "🎂", "🥧"];
 
   const getRandomSweetEmoji = () => {
     return DESSERT_COOKIE_EMOJIS[Math.floor(Math.random() * DESSERT_COOKIE_EMOJIS.length)];
   };
 
-  const handleSendWhatsApp = () => {
+  const generateOrderSummary = () => {
+    let itemsText = "";
+    cart.forEach((cartItem) => {
+      const itemNote = cartItem.notes ? `\n   _Nota: ${cartItem.notes}_` : "";
+      const unitLabel = cartItem.item.unit ? ` (${cartItem.item.unit})` : "";
+      const sweetBullet = getRandomSweetEmoji();
+      itemsText += `${sweetBullet} *${cartItem.quantity}x* ${cartItem.item.name}${unitLabel} - RD$ ${(cartItem.item.price * cartItem.quantity).toLocaleString()}${itemNote}\n`;
+    });
+
+    const deliveryLabel =
+      deliveryMethod === "delivery"
+        ? `🚚 *Para Envío (Delivery)*\n📍 *Dirección:* ${address}`
+        : deliveryMethod === "takeout"
+        ? `🎒 *Para Retirar (Takeout)*`
+        : `🍽️ *Consumo en el Local*\n📌 *Mesa:* ${tableNumber || "No especificada"}`;
+
+    const sweetLeft = getRandomSweetEmoji();
+    const sweetRight = getRandomSweetEmoji();
+    const sweetFooter1 = getRandomSweetEmoji();
+    const sweetFooter2 = getRandomSweetEmoji();
+
+    return `${sweetLeft} *${storeName.toUpperCase()}* ${sweetRight}\n_${storeSubtitle}_\n\n📱 *CLIENTE:* ${customerName}\n${deliveryLabel}\n\n🛒 *DETALLE DEL PEDIDO:*\n===========================\n${itemsText}===========================\n*TOTAL:* RD$ ${subtotal.toLocaleString()}\n\nMuchas gracias ✨${sweetFooter1}${sweetFooter2}`;
+  };
+
+  const handleSendOrder = () => {
     if (cart.length === 0) return;
 
     const newErrors: { customerName?: boolean; address?: boolean } = {};
@@ -80,36 +285,56 @@ export default function CartDrawer({
       return;
     }
 
-    let itemsText = "";
-    cart.forEach((cartItem) => {
-      const itemNote = cartItem.notes ? `\n   _Nota: ${cartItem.notes}_` : "";
-      const unitLabel = cartItem.item.unit ? ` (${cartItem.item.unit})` : "";
-      const sweetBullet = getRandomSweetEmoji();
-      itemsText += `${sweetBullet} *${cartItem.quantity}x* ${cartItem.item.name}${unitLabel} - RD$ ${(cartItem.item.price * cartItem.quantity).toLocaleString()}${itemNote}\n`;
-    });
+    const formattedMessage = generateOrderSummary();
 
-    const deliveryLabel =
-      deliveryMethod === "delivery"
-        ? `🚚 *Para Envío (Delivery)*\n📍 *Dirección:* ${address}`
-        : deliveryMethod === "takeout"
-        ? `🎒 *Para Retirar (Takeout)*`
-        : `🍽️ *Consumo en el Local*\n📌 *Mesa:* ${tableNumber || "No especificada"}`;
+    if (instagramMode) {
+      // 1. Copy order summary to clipboard synchronously
+      copyToClipboardRobust(formattedMessage);
+      setCopiedOrderText(formattedMessage);
+      setIsCopied(true);
 
-    const sweetLeft = getRandomSweetEmoji();
-    const sweetRight = getRandomSweetEmoji();
-    const sweetFooter1 = getRandomSweetEmoji();
-    const sweetFooter2 = getRandomSweetEmoji();
+      if (onNotify) {
+        onNotify("📋 ¡Pedido listo! Abriendo chat de Instagram...");
+      }
 
-    const formattedMessage = `${sweetLeft} *${storeName.toUpperCase()}* ${sweetRight}\n_${storeSubtitle}_\n\n📱 *CLIENTE:* ${customerName}\n${deliveryLabel}\n\n🛒 *DETALLE DEL PEDIDO:*\n===========================\n${itemsText}===========================\n*TOTAL:* RD$ ${subtotal.toLocaleString()}\n\nMuchas gracias ✨${sweetFooter1}${sweetFooter2}`;
+      // 2. Open Instagram DM URL with prefilled text parameter (?text=...)
+      const dmLink = getInstagramDmUrlWithText(instagramDmUrl || "https://ig.me/m/liacookies70", formattedMessage);
+      
+      const isMobile = /iPhone|iPad|iPod|Android|Mobile|Tablet/i.test(navigator.userAgent) || 
+        (typeof navigator.maxTouchPoints === "number" && navigator.maxTouchPoints > 2);
+      
+      if (isMobile) {
+        // Direct navigation so mobile OS smoothly delegates to native Instagram app
+        window.location.href = dmLink;
+      } else {
+        window.open(dmLink, "_blank");
+      }
 
-    const encodedMessage = encodeURIComponent(formattedMessage);
-    const whatsappUrl = `https://wa.me/${whatsappPhone}?text=${encodedMessage}`;
-    window.open(whatsappUrl, "_blank");
+      // 3. Show confirmation modal with full details
+      setShowInstagramSuccessModal(true);
+    } else {
+      // Standard WhatsApp flow
+      const encodedMessage = encodeURIComponent(formattedMessage);
+      const whatsappUrl = `https://wa.me/${whatsappPhone}?text=${encodedMessage}`;
+      window.open(whatsappUrl, "_blank");
+      onClearCart();
+      onClose();
+    }
+  };
 
-    // Clear the cart items since the order has already been executed/sent
+  const handleManualReCopy = () => {
+    const textToCopy = copiedOrderText || generateOrderSummary();
+    copyToClipboardRobust(textToCopy);
+    setIsCopied(true);
+    if (onNotify) {
+      onNotify("✅ ¡Texto copiado de nuevo al portapapeles!");
+    }
+    setTimeout(() => setIsCopied(false), 2500);
+  };
+
+  const handleFinishInstagramOrder = () => {
+    setShowInstagramSuccessModal(false);
     onClearCart();
-
-    // Close the drawer
     onClose();
   };
 
@@ -310,14 +535,36 @@ export default function CartDrawer({
                   {deliveryMethod === "delivery" && (
                     <div className="space-y-2 p-4 bg-primary/10 rounded-2xl border-l-4 border-[#E8005A] border-y border-r border-white/10 shadow-lg relative overflow-hidden animate-fadeIn">
                       <div className="absolute top-0 right-0 w-24 h-24 bg-[#E8005A]/5 rounded-full blur-xl pointer-events-none"></div>
-                      <label className="text-xs font-bold text-gray-200 block flex items-center justify-between">
-                        <span className="flex items-center gap-1.5 text-white font-display uppercase tracking-wider text-[11px]">
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="flex items-center gap-1.5 text-white font-display uppercase tracking-wider text-[11px] font-bold">
                           🚚 Dirección de Envío
-                        </span>
-                        <span className="text-[10px] text-primary font-bold px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 animate-pulse">
-                          Obligatorio
-                        </span>
-                      </label>
+                        </label>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            id="cart-location-btn"
+                            onClick={handleGetLocation}
+                            disabled={isGettingLocation}
+                            className="px-2.5 py-1 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 active:scale-95 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shadow-sm shadow-pink-500/20 transition-all cursor-pointer disabled:opacity-60"
+                            title="Obtener y pegar mi ubicación GPS actual"
+                          >
+                            {isGettingLocation ? (
+                              <>
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                <span>Obteniendo...</span>
+                              </>
+                            ) : (
+                              <>
+                                <MapPin className="w-3 h-3 text-white" />
+                                <span>Ubicación</span>
+                              </>
+                            )}
+                          </button>
+                          <span className="text-[10px] text-primary font-bold px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20">
+                            Obligatorio
+                          </span>
+                        </div>
+                      </div>
                       <textarea
                         id="cart-address-field"
                         rows={2}
@@ -326,7 +573,7 @@ export default function CartDrawer({
                             ? "border-red-500 ring-2 ring-red-500/20 focus:border-red-500"
                             : "border-primary/40 focus:border-primary focus:ring-1 focus:ring-primary shadow-inner"
                         }`}
-                        placeholder="Calle, Número, Sector, Referencia para el delivery..."
+                        placeholder="Calle, Número, Sector o pulsa 'Ubicación' para GPS..."
                         value={address}
                         onChange={(e) => {
                           const val = e.target.value;
@@ -367,7 +614,7 @@ export default function CartDrawer({
             <div className="p-6 bg-black/40 border-t border-white/5 space-y-4">
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center text-sm text-gray-400">
-                  <span>Subtotal del corral</span>
+                  <span>Subtotal</span>
                   <span className="font-mono text-white">RD$ {subtotal.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center text-xs text-gray-500">
@@ -390,19 +637,142 @@ export default function CartDrawer({
                 </div>
               )}
 
+              {instagramMode && (
+                <div className="bg-pink-500/10 border border-pink-500/20 rounded-xl p-2.5 text-[11px] text-pink-200 flex items-center gap-2">
+                  <Instagram className="w-4 h-4 text-pink-400 shrink-0" />
+                  <span>Tu pedido se copiará automáticamente y se abrirá el chat de Instagram para enviarlo.</span>
+                </div>
+              )}
+
               <button
                 id="cart-submit-btn"
-                onClick={handleSendWhatsApp}
-                style={{ backgroundColor: "#E8005A" }}
-                className="w-full py-4 rounded-2xl font-display font-bold text-white hover:opacity-95 selection:bg-none transform transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-primary/20 scale-100 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                onClick={handleSendOrder}
+                className={`w-full py-4 rounded-2xl font-display font-bold text-white hover:opacity-95 selection:bg-none transform transition-all duration-300 flex items-center justify-center gap-2 shadow-lg scale-100 hover:scale-[1.02] active:scale-[0.98] cursor-pointer ${
+                  instagramMode
+                    ? "bg-gradient-to-r from-purple-600 via-pink-600 to-rose-500 shadow-pink-500/25"
+                    : "bg-primary shadow-primary/20"
+                }`}
+                style={!instagramMode ? { backgroundColor: "var(--color-primary, #8A1C9E)" } : {}}
               >
-                <MessageSquare className="w-5 h-5 fill-white text-primary" />
-                <span>Pedir por WhatsApp</span>
+                {instagramMode ? (
+                  <>
+                    {isCopied ? <Check className="w-5 h-5 text-white" /> : <Instagram className="w-5 h-5 text-white" />}
+                    <span>{isCopied ? "¡Pedido Copiado! Abriendo..." : "Pedir por Instagram DM"}</span>
+                  </>
+                ) : (
+                  <>
+                    <MessageSquare className="w-5 h-5 fill-white text-primary" />
+                    <span>Pedir por WhatsApp</span>
+                  </>
+                )}
               </button>
               
               <p className="text-[10px] text-gray-500 text-center uppercase tracking-widest font-display">
                 Estimamos tu total • Impuestos no incluidos
               </p>
+            </div>
+          )}
+
+          {/* Instagram Order Guidance Modal Overlay */}
+          {showInstagramSuccessModal && (
+            <div className="absolute inset-0 z-50 bg-black/90 backdrop-blur-xl flex flex-col p-6 animate-fadeIn justify-between">
+              <div className="space-y-4 overflow-y-auto">
+                <div className="flex items-center justify-between">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 via-pink-600 to-rose-500 flex items-center justify-center text-white shadow-lg shadow-pink-500/30">
+                    <Instagram className="w-6 h-6 text-white" />
+                  </div>
+                  <button
+                    onClick={() => setShowInstagramSuccessModal(false)}
+                    className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-gray-300 flex items-center justify-center transition-colors cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-xs uppercase tracking-wider">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>¡Copiado con Éxito!</span>
+                  </div>
+                  <h3 className="text-xl font-display font-black text-white">
+                    Pega tu pedido en Instagram DM
+                  </h3>
+                  <p className="text-xs text-gray-300 leading-relaxed font-light">
+                    El detalle de tu pedido ya está guardado en tu portapapeles. Sigue estos 2 sencillos pasos:
+                  </p>
+                </div>
+
+                {/* Step-by-step visual instruction */}
+                <div className="space-y-2 bg-white/5 border border-pink-500/20 rounded-2xl p-3.5 text-xs text-gray-200">
+                  <div className="flex items-start gap-2.5">
+                    <span className="w-5 h-5 rounded-full bg-pink-500/20 text-pink-300 font-bold text-[10px] flex items-center justify-center shrink-0 border border-pink-500/30">
+                      1
+                    </span>
+                    <p className="text-[11px] leading-snug">
+                      Entra al chat directo de Instagram <strong className="text-pink-300">@liacookies70</strong>.
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <span className="w-5 h-5 rounded-full bg-pink-500/20 text-pink-300 font-bold text-[10px] flex items-center justify-center shrink-0 border border-pink-500/30">
+                      2
+                    </span>
+                    <p className="text-[11px] leading-snug">
+                      Mantén presionado el campo de escribir mensaje y selecciona <strong className="text-white underline underline-offset-2">Pegar (Paste)</strong>.
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <span className="w-5 h-5 rounded-full bg-pink-500/20 text-pink-300 font-bold text-[10px] flex items-center justify-center shrink-0 border border-pink-500/30">
+                      3
+                    </span>
+                    <p className="text-[11px] leading-snug">
+                      Presiona <strong className="text-emerald-300">Enviar</strong> y listo. ¡Te responderemos de inmediato!
+                    </p>
+                  </div>
+                </div>
+
+                {/* Order Preview Box with re-copy button */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Texto de tu Pedido:</span>
+                    <button
+                      type="button"
+                      onClick={handleManualReCopy}
+                      className="text-[11px] font-bold text-pink-300 hover:text-pink-200 flex items-center gap-1 cursor-pointer bg-pink-500/10 hover:bg-pink-500/20 px-2.5 py-1 rounded-lg border border-pink-500/30 transition-all"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>{isCopied ? "¡Copiado de nuevo!" : "Copiar otra vez"}</span>
+                    </button>
+                  </div>
+                  <div className="bg-black/60 border border-white/10 rounded-xl p-3 max-h-28 overflow-y-auto font-mono text-[11px] text-gray-300 whitespace-pre-wrap leading-relaxed">
+                    {copiedOrderText || generateOrderSummary()}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-4 space-y-2">
+                <a
+                  href={getInstagramDmUrlWithText(
+                    instagramDmUrl || "https://ig.me/m/liacookies70",
+                    copiedOrderText || generateOrderSummary()
+                  )}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full py-3.5 rounded-xl font-display font-bold text-white bg-gradient-to-r from-purple-600 via-pink-600 to-rose-500 hover:opacity-95 flex items-center justify-center gap-2 shadow-lg shadow-pink-500/30 transition-all cursor-pointer"
+                >
+                  <Instagram className="w-4 h-4" />
+                  <span>Abrir Chat de Instagram DM</span>
+                  <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+                </a>
+
+                <button
+                  type="button"
+                  onClick={handleFinishInstagramOrder}
+                  className="w-full py-2.5 rounded-xl font-sans text-xs font-semibold text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/5 transition-all cursor-pointer"
+                >
+                  Ya lo pegué y envié • Cerrar y Limpiar Carrito
+                </button>
+              </div>
             </div>
           )}
         </div>
