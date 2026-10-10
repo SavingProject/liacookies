@@ -131,10 +131,10 @@
     "backgroundGradientColor1": "#320645",
     "backgroundGradientColor2": "#14031E",
     "backgroundGradientDirection": "to bottom",
-    "instagramMode": false,
+    "instagramMode": true,
     "instagramDmUrl": "https://ig.me/m/liacookies70",
     "instagramHandle": "liacookies70"
   },
   "adminPasswordHash": "80d8631e129fd4f25996e4749cee241072d07f37954ad8e23bcb3046eff4f9d5",
-  "updatedAt": 1791594531942
+  "updatedAt": 1791641627978
 }
