@@ -199,11 +199,11 @@ async function startServer() {
 
       // OpenRouter Provider
       if (provider === "openrouter") {
-        const apiKey = config?.openRouterApiKey?.trim();
-        const model = config?.openRouterModel?.trim() || "openrouter/free";
+        const apiKey = (process.env.OPENROUTER_API_KEY || config?.openRouterApiKey || "").trim();
+        const model = (process.env.OPENROUTER_MODEL || config?.openRouterModel || "openrouter/free").trim();
         if (!apiKey) {
           return res.status(400).json({
-            error: "Falta la API Key de OpenRouter. Por favor configúrala en el panel de administración."
+            error: "Falta la API Key de OpenRouter. Configúrala en las variables de entorno de Vercel (OPENROUTER_API_KEY) o en el panel de administración."
           });
         }
 
@@ -238,11 +238,11 @@ async function startServer() {
 
       // OpenAI Provider
       if (provider === "openai") {
-        const apiKey = config?.openAiApiKey?.trim();
-        const model = config?.openAiModel?.trim() || "gpt-4o-mini";
+        const apiKey = (process.env.OPENAI_API_KEY || config?.openAiApiKey || "").trim();
+        const model = (process.env.OPENAI_MODEL || config?.openAiModel || "gpt-4o-mini").trim();
         if (!apiKey) {
           return res.status(400).json({
-            error: "Falta la API Key de OpenAI. Por favor configúrala en el panel de administración."
+            error: "Falta la API Key de OpenAI. Configúrala en las variables de entorno de Vercel (OPENAI_API_KEY) o en el panel de administración."
           });
         }
 
@@ -275,11 +275,11 @@ async function startServer() {
 
       // Gemini Provider
       if (provider === "gemini") {
-        const apiKey = config?.geminiApiKey?.trim() || process.env.GEMINI_API_KEY;
-        const model = config?.geminiModel?.trim() || "gemini-2.5-flash";
+        const apiKey = (process.env.GEMINI_API_KEY || config?.geminiApiKey || "").trim();
+        const model = (process.env.GEMINI_MODEL || config?.geminiModel || "gemini-2.5-flash").trim();
         if (!apiKey) {
           return res.status(400).json({
-            error: "Falta la API Key de Google Gemini. Por favor configúrala en el panel de administración."
+            error: "Falta la API Key de Google Gemini. Configúrala en las variables de entorno de Vercel (GEMINI_API_KEY) o en el panel de administración."
           });
         }
 
@@ -323,9 +323,15 @@ async function startServer() {
 
       // Ollama Provider (Supports Local and Cloud)
       if (provider === "ollama") {
-        let baseUrl = (config?.ollamaBaseUrl?.trim() || "https://ollama.com/v1").replace(/\/+$/, "");
-        const apiKey = config?.ollamaApiKey?.trim();
-        const model = config?.ollamaModel?.trim() || "gemma4:31b-cloud";
+        let baseUrl = (
+          process.env.OLLAMA_BASE_URL ||
+          config?.ollamaBaseUrl ||
+          "https://ollama.com/v1"
+        )
+          .trim()
+          .replace(/\/+$/, "");
+        const apiKey = (process.env.OLLAMA_API_KEY || config?.ollamaApiKey || "").trim();
+        const model = (process.env.OLLAMA_MODEL || config?.ollamaModel || "gemma4:31b-cloud").trim();
 
         const headers: Record<string, string> = {
           "Content-Type": "application/json"

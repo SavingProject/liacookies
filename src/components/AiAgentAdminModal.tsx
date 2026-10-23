@@ -20,7 +20,10 @@ import {
   ShoppingBag,
   Cookie,
   Copy,
-  CheckCheck
+  CheckCheck,
+  Lock,
+  Unlock,
+  Globe
 } from "lucide-react";
 import { MenuItem, MenuCategory, StoreSettings, ContactInfo, AiAgentConfig, AiProvider } from "../types";
 import { DEFAULT_MASTER_PROMPT, DEFAULT_AI_AGENT_CONFIG, buildFullAiPrompt } from "../utils/aiPromptBuilder";
@@ -114,6 +117,7 @@ export const AiAgentAdminModal: React.FC<AiAgentAdminModalProps> = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           provider: formConfig.provider,
+          useVercelEnv: Boolean(formConfig.useVercelEnv),
           messages: [
             { role: "system", content: fullSystemPrompt },
             { role: "user", content: testPrompt },
@@ -160,6 +164,298 @@ export const AiAgentAdminModal: React.FC<AiAgentAdminModalProps> = ({
     if (confirm("¿Deseas restaurar el Prompt Maestro por defecto para Lia Cookies?")) {
       handleFieldChange("masterPrompt", DEFAULT_MASTER_PROMPT);
     }
+  };
+
+  // Render Vercel Configuration card for the currently selected & active AI provider
+  const renderVercelConfigCard = () => {
+    if (!formConfig.useVercelEnv) return null;
+
+    let varName = "";
+    let modelVar = "";
+    let modelVal = "";
+    let currentKeyVal = "";
+    let providerName = "";
+    let providerIcon = "";
+    let extraVarName = "";
+    let extraVarVal = "";
+
+    if (formConfig.provider === "openrouter") {
+      providerName = "OpenRouter";
+      providerIcon = "🌐";
+      varName = "OPENROUTER_API_KEY";
+      modelVar = "OPENROUTER_MODEL";
+      modelVal = formConfig.openRouterModel || "openrouter/free";
+      currentKeyVal = formConfig.openRouterApiKey || "";
+    } else if (formConfig.provider === "openai") {
+      providerName = "OpenAI";
+      providerIcon = "⚡";
+      varName = "OPENAI_API_KEY";
+      modelVar = "OPENAI_MODEL";
+      modelVal = formConfig.openAiModel || "gpt-4o-mini";
+      currentKeyVal = formConfig.openAiApiKey || "";
+    } else if (formConfig.provider === "gemini") {
+      providerName = "Google Gemini";
+      providerIcon = "💎";
+      varName = "GEMINI_API_KEY";
+      modelVar = "GEMINI_MODEL";
+      modelVal = formConfig.geminiModel || "gemini-2.5-flash";
+      currentKeyVal = formConfig.geminiApiKey || "";
+    } else if (formConfig.provider === "ollama") {
+      providerName = "Ollama";
+      providerIcon = "🦙";
+      varName = "OLLAMA_API_KEY";
+      modelVar = "OLLAMA_MODEL";
+      modelVal = formConfig.ollamaModel || "gemma4:31b-cloud";
+      extraVarName = "OLLAMA_BASE_URL";
+      extraVarVal = formConfig.ollamaBaseUrl || "https://ollama.com/v1";
+      currentKeyVal = formConfig.ollamaApiKey || "";
+    }
+
+    const envSnippetLines: string[] = [
+      `# Variables de Entorno para Vercel - Lia Cookies ChipBot (${providerName})`
+    ];
+    if (extraVarName) {
+      envSnippetLines.push(`${extraVarName}=${extraVarVal}`);
+    }
+    envSnippetLines.push(`${varName}=${currentKeyVal || "TU_API_KEY_AQUI"}`);
+    if (modelVar) {
+      envSnippetLines.push(`${modelVar}=${modelVal}`);
+    }
+    const fullEnvSnippet = envSnippetLines.join("\n");
+
+    return (
+      <div className="bg-gradient-to-br from-gray-950 via-black to-emerald-950/20 border-2 border-emerald-500/40 rounded-2xl p-4 sm:p-5 space-y-4 shadow-xl shadow-emerald-500/5 relative overflow-hidden animate-fadeIn mb-4">
+        <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none" />
+
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-white text-black font-black flex items-center justify-center text-sm shadow-md">
+              ▲
+            </div>
+            <div>
+              <h4 className="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
+                <span>Configuración de API para Vercel — {providerName}</span>
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-400 font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">
+                  {providerIcon} Proveedor Activo
+                </span>
+              </h4>
+              <p className="text-[11px] text-gray-400">
+                Usa estas variables de entorno en Vercel para ejecutar tu modelo de forma 100% segura y privada.
+              </p>
+            </div>
+          </div>
+
+          <span className="text-[10px] text-emerald-300 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20 flex items-center gap-1 self-start sm:self-auto font-mono">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Serverless Seguro</span>
+          </span>
+        </div>
+
+        {/* Variables Cards */}
+        <div className="space-y-3">
+          {/* Main Key Variable */}
+          <div className="bg-black/60 border border-white/10 rounded-xl p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                <KeyRound className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Variable Principal de API Key (Vercel):</span>
+              </span>
+              <span className="text-[10px] text-pink-400 font-bold bg-pink-500/10 px-2 py-0.5 rounded-full border border-pink-500/20">
+                Obligatoria en Vercel
+              </span>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 bg-black/80 p-2.5 rounded-lg border border-white/5">
+              <div className="font-mono text-xs font-bold text-emerald-300 select-all break-all">
+                {varName}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleCopySnippet(varName, `var_${varName}`)}
+                  className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                >
+                  {copiedSnippet === `var_${varName}` ? (
+                    <>
+                      <Check className="w-3 h-3 text-emerald-400" />
+                      <span>¡Copiado!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3" />
+                      <span>Copiar Nombre</span>
+                    </>
+                  )}
+                </button>
+
+                {currentKeyVal && (
+                  <button
+                    type="button"
+                    onClick={() => handleCopySnippet(currentKeyVal, `val_${varName}`)}
+                    className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                    title="Copia el valor que tienes escrito actualmente para pegarlo en Vercel"
+                  >
+                    {copiedSnippet === `val_${varName}` ? (
+                      <>
+                        <Check className="w-3 h-3 text-emerald-400" />
+                        <span>¡Clave Copiada!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3" />
+                        <span>Copiar Clave</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Extra Variable (Base URL for Ollama) */}
+          {extraVarName && (
+            <div className="bg-black/60 border border-white/10 rounded-xl p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>URL del Servidor Ollama (Vercel):</span>
+                </span>
+              </div>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 bg-black/80 p-2.5 rounded-lg border border-white/5">
+                <div>
+                  <div className="font-mono text-xs font-bold text-cyan-300 select-all">
+                    {extraVarName}
+                  </div>
+                  <div className="font-mono text-[10px] text-gray-400 mt-0.5">
+                    Valor recomendado: {extraVarVal}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleCopySnippet(extraVarName, `var_${extraVarName}`)}
+                  className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer self-start sm:self-auto"
+                >
+                  {copiedSnippet === `var_${extraVarName}` ? (
+                    <>
+                      <Check className="w-3 h-3 text-emerald-400" />
+                      <span>¡Copiado!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3" />
+                      <span>Copiar Nombre</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Model Variable */}
+          {modelVar && (
+            <div className="bg-black/60 border border-white/10 rounded-xl p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Variable para Modelo (Opcional en Vercel):</span>
+                </span>
+                <span className="text-[10px] text-gray-400 font-mono">
+                  Por defecto: {modelVal}
+                </span>
+              </div>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 bg-black/80 p-2.5 rounded-lg border border-white/5">
+                <div>
+                  <div className="font-mono text-xs font-bold text-purple-300 select-all">
+                    {modelVar}
+                  </div>
+                  <div className="font-mono text-[10px] text-gray-400 mt-0.5">
+                    Valor: {modelVal}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleCopySnippet(modelVar, `var_${modelVar}`)}
+                  className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer self-start sm:self-auto"
+                >
+                  {copiedSnippet === `var_${modelVar}` ? (
+                    <>
+                      <Check className="w-3 h-3 text-emerald-400" />
+                      <span>¡Copiado!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3" />
+                      <span>Copiar Nombre</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Copy All Button & Links */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-1">
+          <button
+            type="button"
+            onClick={() => handleCopySnippet(fullEnvSnippet, "full_env_snippet")}
+            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+          >
+            {copiedSnippet === "full_env_snippet" ? (
+              <>
+                <Check className="w-4 h-4 text-white" />
+                <span>¡Variables Copiadas para Vercel!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-4 h-4 text-white" />
+                <span>Copiar Bloque Completo para Vercel / .env</span>
+              </>
+            )}
+          </button>
+
+          <a
+            href="https://vercel.com/docs/projects/environment-variables"
+            target="_blank"
+            rel="noreferrer"
+            className="text-[11px] text-gray-400 hover:text-white flex items-center justify-center gap-1 underline underline-offset-2 py-1"
+          >
+            <span>Ver docs de Vercel</span>
+            <ExternalLink className="w-3 h-3" />
+          </a>
+        </div>
+
+        {/* Step-by-Step Instructions */}
+        <div className="bg-black/50 border border-white/5 rounded-xl p-3.5 space-y-2 text-xs text-gray-300">
+          <div className="font-bold text-white flex items-center gap-1.5 text-[11px] uppercase tracking-wider">
+            <span>📋 Pasos para configurar en Vercel:</span>
+          </div>
+          <ol className="list-decimal list-inside space-y-1.5 text-[11px] text-gray-400 leading-relaxed">
+            <li>
+              Abre tu proyecto en <strong className="text-white">Vercel.com</strong> &gt; ve a <strong className="text-white">Settings</strong> &gt; <strong className="text-white">Environment Variables</strong>.
+            </li>
+            <li>
+              En <strong className="text-white">Key</strong> pega <code className="text-emerald-300 font-mono bg-white/5 px-1 rounded">{varName}</code> y en <strong className="text-white">Value</strong> tu API Key.
+            </li>
+            <li>
+              Marca los entornos <strong className="text-white">Production</strong>, <strong className="text-white">Preview</strong> y <strong className="text-white">Development</strong>.
+            </li>
+            <li>
+              Guarda y realiza un <strong className="text-white">Redeploy</strong> para que Vercel cargue la variable en las funciones serverless.
+            </li>
+          </ol>
+        </div>
+
+        {/* Security Advantage Box */}
+        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-200 flex items-start gap-2">
+          <Lock className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+          <span className="leading-relaxed">
+            <strong>Protección Total:</strong> Al estar en Modo Vercel, la API Key NUNCA viaja al navegador ni se guarda en el archivo público. El endpoint de servidor <code className="bg-black/40 px-1 py-0.5 rounded text-white font-mono">/api/ai/chat</code> la toma directamente de las variables de entorno de Vercel. Puedes dejar el campo de texto de abajo en blanco.
+          </span>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -293,6 +589,45 @@ export const AiAgentAdminModal: React.FC<AiAgentAdminModalProps> = ({
             </div>
           </div>
 
+          {/* Vercel Environment Deployment Mode Toggle Button */}
+          <div className="bg-gradient-to-r from-gray-950 via-black to-emerald-950/30 border border-emerald-500/30 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg shadow-emerald-950/20">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-white text-black flex items-center justify-center font-black text-xs shadow-sm">
+                  ▲
+                </div>
+                <span className="text-sm font-bold text-white flex items-center gap-2">
+                  <span>Modo Despliegue en Vercel (Variables de Entorno Seguras)</span>
+                  {formConfig.useVercelEnv && (
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                      ACTIVO
+                    </span>
+                  )}
+                </span>
+              </div>
+              <p className="text-xs text-gray-400">
+                {formConfig.useVercelEnv
+                  ? "🔒 Modo Vercel Activo: Tu API Key se configurará en las variables de entorno de Vercel y se ejecutará en el servidor (/api/ai/chat) sin exponerse en el navegador."
+                  : "Permite configurar el agente IA en Vercel leyendo la API Key de las variables de entorno del servidor para no exponerla públicamente."}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              id="vercel-env-toggle-btn"
+              onClick={() => handleFieldChange("useVercelEnv", !formConfig.useVercelEnv)}
+              className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shrink-0 ${
+                formConfig.useVercelEnv
+                  ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:opacity-95 shadow-emerald-500/30 ring-2 ring-emerald-400/40"
+                  : "bg-white/10 text-gray-400 hover:text-white hover:bg-white/15 border border-white/10"
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${formConfig.useVercelEnv ? "bg-white animate-ping" : "bg-gray-400"}`} />
+              <span>{formConfig.useVercelEnv ? "▲ Vercel Activo (ON)" : "Activar Modo Vercel"}</span>
+            </button>
+          </div>
+
           {/* AI Provider Tabs Selection */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -351,6 +686,9 @@ export const AiAgentAdminModal: React.FC<AiAgentAdminModalProps> = ({
 
           {/* Provider Specific Configuration Form */}
           <div className="bg-black/40 border border-white/10 rounded-2xl p-4 space-y-4">
+            {/* Vercel Environment Configuration Card (Shown when Vercel mode is active) */}
+            {renderVercelConfigCard()}
+
             {/* 1. OPENROUTER */}
             {formConfig.provider === "openrouter" && (
               <div className="space-y-4 animate-fadeIn">
@@ -369,18 +707,35 @@ export const AiAgentAdminModal: React.FC<AiAgentAdminModalProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase text-gray-400 font-bold block">
-                    OpenRouter API Key
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] uppercase text-gray-400 font-bold block">
+                      OpenRouter API Key
+                    </label>
+                    {formConfig.useVercelEnv && (
+                      <span className="text-[9px] text-emerald-400 font-mono flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                        <Lock className="w-3 h-3" />
+                        <span>En Vercel: OPENROUTER_API_KEY</span>
+                      </span>
+                    )}
+                  </div>
                   <input
                     type={showApiKey ? "text" : "password"}
                     value={formConfig.openRouterApiKey || ""}
                     onChange={(e) =>
                       handleFieldChange("openRouterApiKey", e.target.value)
                     }
-                    placeholder="sk-or-v1-..."
+                    placeholder={
+                      formConfig.useVercelEnv
+                        ? "Opcional en Modo Vercel (se leerá de OPENROUTER_API_KEY en el servidor)"
+                        : "sk-or-v1-..."
+                    }
                     className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-pink-500"
                   />
+                  {formConfig.useVercelEnv && (
+                    <p className="text-[10px] text-emerald-400/90 font-mono flex items-center gap-1">
+                      🔒 Servidor Vercel: Puedes dejar este campo vacío; se utilizará la variable de entorno configurada.
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1">
@@ -435,18 +790,35 @@ export const AiAgentAdminModal: React.FC<AiAgentAdminModalProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase text-gray-400 font-bold block">
-                    OpenAI API Key
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] uppercase text-gray-400 font-bold block">
+                      OpenAI API Key
+                    </label>
+                    {formConfig.useVercelEnv && (
+                      <span className="text-[9px] text-emerald-400 font-mono flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                        <Lock className="w-3 h-3" />
+                        <span>En Vercel: OPENAI_API_KEY</span>
+                      </span>
+                    )}
+                  </div>
                   <input
                     type={showApiKey ? "text" : "password"}
                     value={formConfig.openAiApiKey || ""}
                     onChange={(e) =>
                       handleFieldChange("openAiApiKey", e.target.value)
                     }
-                    placeholder="sk-proj-..."
+                    placeholder={
+                      formConfig.useVercelEnv
+                        ? "Opcional en Modo Vercel: se leerá de OPENAI_API_KEY en el servidor"
+                        : "sk-proj-..."
+                    }
                     className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-pink-500"
                   />
+                  {formConfig.useVercelEnv && (
+                    <p className="text-[10px] text-emerald-400/90 font-mono flex items-center gap-1">
+                      🔒 Servidor Vercel: Puedes dejar este campo vacío; se utilizará la variable de entorno configurada.
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1">
@@ -496,18 +868,35 @@ export const AiAgentAdminModal: React.FC<AiAgentAdminModalProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase text-gray-400 font-bold block">
-                    Gemini API Key
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] uppercase text-gray-400 font-bold block">
+                      Gemini API Key
+                    </label>
+                    {formConfig.useVercelEnv && (
+                      <span className="text-[9px] text-emerald-400 font-mono flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                        <Lock className="w-3 h-3" />
+                        <span>En Vercel: GEMINI_API_KEY</span>
+                      </span>
+                    )}
+                  </div>
                   <input
                     type={showApiKey ? "text" : "password"}
                     value={formConfig.geminiApiKey || ""}
                     onChange={(e) =>
                       handleFieldChange("geminiApiKey", e.target.value)
                     }
-                    placeholder="AIzaSy..."
+                    placeholder={
+                      formConfig.useVercelEnv
+                        ? "Opcional en Modo Vercel: se leerá de GEMINI_API_KEY en el servidor"
+                        : "AIzaSy..."
+                    }
                     className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-pink-500"
                   />
+                  {formConfig.useVercelEnv && (
+                    <p className="text-[10px] text-emerald-400/90 font-mono flex items-center gap-1">
+                      🔒 Servidor Vercel: Puedes dejar este campo vacío; se utilizará la variable de entorno configurada.
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1">
@@ -556,9 +945,17 @@ export const AiAgentAdminModal: React.FC<AiAgentAdminModalProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase text-gray-400 font-bold block">
-                    Base URL (por defecto: https://ollama.com/v1)
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] uppercase text-gray-400 font-bold block">
+                      Base URL (por defecto: https://ollama.com/v1)
+                    </label>
+                    {formConfig.useVercelEnv && (
+                      <span className="text-[9px] text-cyan-400 font-mono flex items-center gap-1 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
+                        <Globe className="w-3 h-3" />
+                        <span>En Vercel: OLLAMA_BASE_URL</span>
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={formConfig.ollamaBaseUrl || "https://ollama.com/v1"}
@@ -587,18 +984,35 @@ export const AiAgentAdminModal: React.FC<AiAgentAdminModalProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase text-gray-400 font-bold block">
-                    API Key (opcional si es local, requerida para cloud)
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] uppercase text-gray-400 font-bold block">
+                      API Key (opcional si es local, requerida para cloud)
+                    </label>
+                    {formConfig.useVercelEnv && (
+                      <span className="text-[9px] text-emerald-400 font-mono flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                        <Lock className="w-3 h-3" />
+                        <span>En Vercel: OLLAMA_API_KEY</span>
+                      </span>
+                    )}
+                  </div>
                   <input
                     type={showApiKey ? "text" : "password"}
                     value={formConfig.ollamaApiKey || ""}
                     onChange={(e) =>
                       handleFieldChange("ollamaApiKey", e.target.value)
                     }
-                    placeholder="Dejar en blanco si tu Ollama local no requiere clave"
+                    placeholder={
+                      formConfig.useVercelEnv
+                        ? "Opcional en Modo Vercel: se leerá de OLLAMA_API_KEY en el servidor"
+                        : "Dejar en blanco si tu Ollama local no requiere clave"
+                    }
                     className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-pink-500"
                   />
+                  {formConfig.useVercelEnv && (
+                    <p className="text-[10px] text-emerald-400/90 font-mono flex items-center gap-1">
+                      🔒 Servidor Vercel: Puedes dejar este campo vacío; se utilizará la variable de entorno configurada.
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1">

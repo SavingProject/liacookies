@@ -89,6 +89,7 @@ REGLA DE ORO: Las acciones de carrito [cart:add|...], [cart:remove|...], [cart:d
 export const DEFAULT_AI_AGENT_CONFIG: AiAgentConfig = {
   enabled: true,
   provider: "openrouter",
+  useVercelEnv: false,
   openRouterApiKey: "",
   openRouterModel: "openrouter/free",
   openAiApiKey: "",

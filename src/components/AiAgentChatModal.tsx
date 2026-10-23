@@ -1205,6 +1205,7 @@ export const AiAgentChatModal: React.FC<AiAgentChatModalProps> = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           provider: aiConfig.provider || "openrouter",
+          useVercelEnv: Boolean(aiConfig.useVercelEnv),
           messages: historyPayload,
           config: {
             openRouterApiKey: aiConfig.openRouterApiKey,

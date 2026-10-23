@@ -77,6 +77,7 @@ export type AiProvider = "openrouter" | "openai" | "gemini" | "ollama";
 export interface AiAgentConfig {
   enabled: boolean;
   provider: AiProvider;
+  useVercelEnv?: boolean; // When active, API keys are configured and read securely via Vercel Environment Variables
   
   // OpenRouter
   openRouterApiKey?: string;
