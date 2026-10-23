@@ -188,6 +188,207 @@ async function startServer() {
     }
   });
 
+  // AI Agent Chat Proxy Endpoint (Supports OpenRouter, OpenAI, Gemini, Ollama Local/Cloud)
+  app.post("/api/ai/chat", async (req, res) => {
+    try {
+      const { provider, messages, config } = req.body;
+
+      if (!messages || !Array.isArray(messages)) {
+        return res.status(400).json({ error: "Missing or invalid 'messages' array." });
+      }
+
+      // OpenRouter Provider
+      if (provider === "openrouter") {
+        const apiKey = config?.openRouterApiKey?.trim();
+        const model = config?.openRouterModel?.trim() || "openrouter/free";
+        if (!apiKey) {
+          return res.status(400).json({
+            error: "Falta la API Key de OpenRouter. Por favor configúrala en el panel de administración."
+          });
+        }
+
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`,
+            "HTTP-Referer": "https://liacookies.com",
+            "X-Title": "Lia Cookies Agent"
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: messages
+          })
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          let parsed;
+          try { parsed = JSON.parse(errText); } catch (_) {}
+          const errorMsg = parsed?.error?.message || errText || response.statusText;
+          return res.status(response.status).json({
+            error: `Error de OpenRouter (${response.status}): ${errorMsg}`
+          });
+        }
+
+        const data: any = await response.json();
+        const reply = data.choices?.[0]?.message?.content || "";
+        return res.json({ reply });
+      }
+
+      // OpenAI Provider
+      if (provider === "openai") {
+        const apiKey = config?.openAiApiKey?.trim();
+        const model = config?.openAiModel?.trim() || "gpt-4o-mini";
+        if (!apiKey) {
+          return res.status(400).json({
+            error: "Falta la API Key de OpenAI. Por favor configúrala en el panel de administración."
+          });
+        }
+
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: messages
+          })
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          let parsed;
+          try { parsed = JSON.parse(errText); } catch (_) {}
+          const errorMsg = parsed?.error?.message || errText || response.statusText;
+          return res.status(response.status).json({
+            error: `Error de OpenAI (${response.status}): ${errorMsg}`
+          });
+        }
+
+        const data: any = await response.json();
+        const reply = data.choices?.[0]?.message?.content || "";
+        return res.json({ reply });
+      }
+
+      // Gemini Provider
+      if (provider === "gemini") {
+        const apiKey = config?.geminiApiKey?.trim() || process.env.GEMINI_API_KEY;
+        const model = config?.geminiModel?.trim() || "gemini-2.5-flash";
+        if (!apiKey) {
+          return res.status(400).json({
+            error: "Falta la API Key de Google Gemini. Por favor configúrala en el panel de administración."
+          });
+        }
+
+        const systemMsg = messages.find((m: any) => m.role === "system");
+        const chatMsgs = messages.filter((m: any) => m.role !== "system");
+
+        const contents = chatMsgs.map((m: any) => ({
+          role: m.role === "assistant" ? "model" : "user",
+          parts: [{ text: m.content }]
+        }));
+
+        const bodyPayload: any = { contents };
+        if (systemMsg) {
+          bodyPayload.systemInstruction = {
+            parts: [{ text: systemMsg.content }]
+          };
+        }
+
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(bodyPayload)
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          let parsed;
+          try { parsed = JSON.parse(errText); } catch (_) {}
+          const errorMsg = parsed?.error?.message || errText || response.statusText;
+          return res.status(response.status).json({
+            error: `Error de Gemini (${response.status}): ${errorMsg}`
+          });
+        }
+
+        const data: any = await response.json();
+        const candidate = data.candidates?.[0];
+        const reply = candidate?.content?.parts?.[0]?.text || "";
+        return res.json({ reply });
+      }
+
+      // Ollama Provider (Supports Local and Cloud)
+      if (provider === "ollama") {
+        let baseUrl = (config?.ollamaBaseUrl?.trim() || "https://ollama.com/v1").replace(/\/+$/, "");
+        const apiKey = config?.ollamaApiKey?.trim();
+        const model = config?.ollamaModel?.trim() || "gemma4:31b-cloud";
+
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json"
+        };
+        if (apiKey) {
+          headers["Authorization"] = `Bearer ${apiKey}`;
+        }
+
+        // Check if user URL already has /chat/completions or /api/chat
+        let endpoint = baseUrl;
+        if (!baseUrl.endsWith("/chat/completions") && !baseUrl.endsWith("/api/chat")) {
+          endpoint = baseUrl.endsWith("/v1")
+            ? `${baseUrl}/chat/completions`
+            : `${baseUrl}/v1/chat/completions`;
+        }
+
+        let response = await fetch(endpoint, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            model: model,
+            messages: messages,
+            stream: false
+          })
+        });
+
+        // Fallback to /api/chat if 404
+        if (response.status === 404 && !endpoint.includes("/api/chat")) {
+          const nativeBase = baseUrl.replace(/\/v1$/, "");
+          endpoint = `${nativeBase}/api/chat`;
+          response = await fetch(endpoint, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              model: model,
+              messages: messages,
+              stream: false
+            })
+          });
+        }
+
+        if (!response.ok) {
+          const errText = await response.text();
+          let parsed;
+          try { parsed = JSON.parse(errText); } catch (_) {}
+          const errorMsg = parsed?.error || parsed?.message || errText || response.statusText;
+          return res.status(response.status).json({
+            error: `Error de Ollama (${response.status}): ${errorMsg}`
+          });
+        }
+
+        const data: any = await response.json();
+        const reply = data.choices?.[0]?.message?.content || data.message?.content || "";
+        return res.json({ reply });
+      }
+
+      return res.status(400).json({ error: `Proveedor desconocido: ${provider}` });
+    } catch (err: any) {
+      console.error("Error in /api/ai/chat:", err);
+      return res.status(500).json({ error: `Fallo en el servicio IA: ${err.message || String(err)}` });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

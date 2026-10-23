@@ -20,8 +20,13 @@ import MenuItemCard from "./components/MenuItemCard";
 import BankDetails, { BankAccountItem } from "./components/BankDetails";
 import CartDrawer from "./components/CartDrawer";
 import ImageDropUpload from "./components/ImageDropUpload";
+import { CookieBotIcon25D } from "./components/CookieBotIcon25D";
+import { AiAgentChatModal } from "./components/AiAgentChatModal";
+import { AiAgentAdminModal } from "./components/AiAgentAdminModal";
+import { DEFAULT_AI_AGENT_CONFIG } from "./utils/aiPromptBuilder";
 import { safeSetLocalStorage } from "./utils/imageOptimizer";
 import {
+  Bot,
   Instagram,
   Phone,
   ShoppingBag,
@@ -193,6 +198,19 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("entradas");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [lastSentOrder, setLastSentOrder] = useState<{
+    text: string;
+    channel: "whatsapp" | "instagram";
+    timestamp: number;
+  } | null>(null);
+
+  const handleOrderSent = (orderText: string, channel: "whatsapp" | "instagram") => {
+    setLastSentOrder({
+      text: orderText,
+      channel,
+      timestamp: Date.now(),
+    });
+  };
 
   // --- Admin Mode States & Helpers ---
   const [isAdminPath, setIsAdminPath] = useState(false);
@@ -207,6 +225,8 @@ export default function App() {
   const [showChangePassModal, setShowChangePassModal] = useState(false);
   const [showBrandingModal, setShowBrandingModal] = useState(false);
   const [showBackupModal, setShowBackupModal] = useState(false);
+  const [showAiAgentModal, setShowAiAgentModal] = useState(false);
+  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [currentPassInput, setCurrentPassInput] = useState("");
   const [newPassInput, setNewPassInput] = useState("");
   const [confirmPassInput, setConfirmPassInput] = useState("");
@@ -839,6 +859,27 @@ export default function App() {
     });
   };
 
+  const handleBatchAddToCart = (itemsToAdd: { item: MenuItem; quantity: number }[]) => {
+    if (!itemsToAdd || itemsToAdd.length === 0) return;
+    setCart((prevCart) => {
+      let nextCart = [...prevCart];
+      itemsToAdd.forEach(({ item, quantity }) => {
+        const existingIdx = nextCart.findIndex((ci) => ci.item.id === item.id);
+        if (existingIdx >= 0) {
+          nextCart[existingIdx] = {
+            ...nextCart[existingIdx],
+            quantity: nextCart[existingIdx].quantity + (quantity || 1)
+          };
+        } else {
+          nextCart.push({ item, quantity: quantity || 1 });
+        }
+      });
+      return nextCart;
+    });
+    const totalCount = itemsToAdd.reduce((sum, i) => sum + i.quantity, 0);
+    showToast(`🛒 ¡${totalCount} galleta${totalCount > 1 ? "s" : ""} colocada${totalCount > 1 ? "s" : ""} en tu pedido! 🍪✨`);
+  };
+
   const handleAddSpecialtyToCart = () => {
     // 1. Try to find the item in current state
     const foundItem = menuItems.find((i) => i.id === "mofongo_mp")
@@ -1150,6 +1191,19 @@ export default function App() {
             >
               <FileJson className="w-3.5 h-3.5 text-amber-400" />
               <span>Backup / JSON</span>
+            </button>
+
+            <button
+              onClick={() => setShowAiAgentModal(true)}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                storeSettings.aiAgent?.enabled !== false
+                  ? "bg-purple-600/25 text-purple-300 border-purple-500/40 hover:bg-purple-600/35 shadow-sm shadow-purple-500/20"
+                  : "bg-gray-600/10 text-gray-400 border-gray-600/20 hover:bg-gray-600/20"
+              }`}
+              title="Configurar modelos, claves y comportamiento del Agente IA"
+            >
+              <Bot className="w-3.5 h-3.5 text-pink-400" />
+              <span>🤖 Agente IA: {storeSettings.aiAgent?.enabled !== false ? "ACTIVO" : "INACTIVO"}</span>
             </button>
 
             <button
@@ -3325,30 +3379,60 @@ export default function App() {
         </div>
       )}
 
-      {/* Sticky Floating Chat / Help widget on bottom-right */}
-      {totalCartCount === 0 && (
-        <a
-          id={storeSettings.instagramMode !== false ? "instagram-floating-ball" : "whatsapp-floating-ball"}
-          href={storeSettings.instagramMode !== false ? (storeSettings.instagramDmUrl || "https://ig.me/m/liacookies70") : `https://wa.me/${contactInfo.phone}`}
-          target="_blank"
-          rel="noreferrer"
-          className={`fixed bottom-6 right-6 z-40 text-white p-4 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 hover:scale-110 active:scale-90 cursor-pointer group ${
-            storeSettings.instagramMode !== false
-              ? "bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] shadow-pink-500/30 hover:shadow-pink-500/50"
-              : "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20"
-          }`}
-        >
-          {/* Chat Bubble Help effect */}
-          <span className="absolute right-14 bg-black/90 text-white border border-white/10 text-[10px] font-display font-bold px-3 py-1.5 rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none shadow-xl backdrop-blur-md">
-            {storeSettings.instagramMode !== false ? "¡Escríbenos por Instagram DM! 💬✨" : "¡Dime de qué tienes deseos! 👋"}
-          </span>
-          {storeSettings.instagramMode !== false ? (
-            <Instagram className="w-6 h-6 text-white" />
-          ) : (
-            <MessageCircle className="w-6 h-6 fill-white text-emerald-500" />
-          )}
-        </a>
-      )}
+      {/* Sticky Floating 2.5D Cookie Bot AI Agent on bottom-right */}
+      <CookieBotIcon25D
+        botName={storeSettings.aiAgent?.botName || "ChipBot"}
+        greetingMessage={
+          storeSettings.aiAgent?.greetingMessage || "¡Hola! 🍪 Soy ChipBot. ¿Puedo ayudarte?"
+        }
+        animationFrequency={storeSettings.aiAgent?.animationFrequency || "normal"}
+        isActive={storeSettings.aiAgent?.enabled !== false}
+        onClick={() => setIsAiChatOpen(!isAiChatOpen)}
+        primaryColor={storeSettings.primaryColor || "#8A1C9E"}
+      />
+
+      {/* Floating AI Agent Chat Modal */}
+      <AiAgentChatModal
+        isOpen={isAiChatOpen}
+        onClose={() => setIsAiChatOpen(false)}
+        aiConfig={storeSettings.aiAgent || DEFAULT_AI_AGENT_CONFIG}
+        menuItems={menuItems}
+        categories={categories}
+        storeSettings={storeSettings}
+        bankAccounts={bankAccounts}
+        contactInfo={contactInfo}
+        cart={cart}
+        lastSentOrder={lastSentOrder}
+        onOpenCart={() => setIsCartOpen(true)}
+        onAddToCart={handleAddToCart}
+        onBatchAddToCart={handleBatchAddToCart}
+        onUpdateQuantity={handleUpdateQuantity}
+        onRemoveItem={handleRemoveItem}
+        onClearCart={handleClearCart}
+        onOrderSent={handleOrderSent}
+        onNavigateToSection={handleScrollToSection}
+        showToast={showToast}
+      />
+
+      {/* Admin AI Agent Configuration Modal */}
+      <AiAgentAdminModal
+        isOpen={showAiAgentModal}
+        onClose={() => setShowAiAgentModal(false)}
+        config={storeSettings.aiAgent || DEFAULT_AI_AGENT_CONFIG}
+        onSave={(newAiConfig) => {
+          handleUpdateSetting("aiAgent", newAiConfig);
+          showToast(
+            newAiConfig.enabled
+              ? "🤖 ¡Agente IA configurado y ACTIVADO! 🍪✨"
+              : "🤖 Agente IA guardado en modo DESACTIVADO."
+          );
+        }}
+        menuItems={menuItems}
+        categories={categories}
+        storeSettings={storeSettings}
+        bankAccounts={bankAccounts}
+        contactInfo={contactInfo}
+      />
 
       {/* Cart Drawer Component */}
       <CartDrawer
@@ -3365,6 +3449,7 @@ export default function App() {
         instagramMode={storeSettings.instagramMode !== false}
         instagramDmUrl={storeSettings.instagramDmUrl || "https://ig.me/m/liacookies70"}
         onNotify={showToast}
+        onOrderSent={handleOrderSent}
       />
 
       {/* Brand Footer */}

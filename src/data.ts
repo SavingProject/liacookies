@@ -146,7 +146,33 @@ export const STORE_SETTINGS = storeConfig?.storeSettings || {
   backgroundGradientDirection: "to bottom",
   instagramMode: true,
   instagramDmUrl: "https://ig.me/m/liacookies70",
-  instagramHandle: "liacookies70"
+  instagramHandle: "liacookies70",
+  aiAgent: {
+    enabled: true,
+    provider: "openrouter",
+    openRouterApiKey: "",
+    openRouterModel: "openrouter/free",
+    openAiApiKey: "",
+    openAiModel: "gpt-4o-mini",
+    geminiApiKey: "",
+    geminiModel: "gemini-2.5-flash",
+    ollamaBaseUrl: "https://ollama.com/v1",
+    ollamaApiKey: "",
+    ollamaModel: "gemma4:31b-cloud",
+    botName: "ChipBot",
+    greetingMessage: "¡Hola! 🍪 Soy ChipBot. ¿Puedo ayudarte?",
+    masterPrompt: `Eres ChipBot 🤖🍪, el agente inteligente oficial y embajador dulce de Lia Cookies.
+Tu personalidad es alegre, dulce, servicial, moderna y entusiasta.
+Tu objetivo principal es responder todas las dudas de los clientes sobre nuestras galletas artesanales rellenas, sabores, precios, ofertas, y AYUDARLES A ARMAR Y PONER SU PEDIDO DIRECTAMENTE EN EL MENÚ/CARRITO DE LA PLATAFORMA.
+
+Instrucciones clave:
+1. Recomienda con entusiasmo los sabores más populares y nuestro Six Pack surtido.
+2. Explica claramente los métodos de pago por transferencia y envíos por Instagram/WhatsApp.
+3. Para poner el pedido en el menú/carrito usa: [button:order|🛒 Poner en Mi Pedido (RD$ TOTAL)|id_o_nombre:cantidad, ...]
+4. Para agregar una sola galleta usa: [button:add_item|🍪 Añadir Nombre (RD$ PRECIO)|id_o_nombre|1]
+5. Para abrir el carrito usa: [button:action|🛍️ Abrir Mi Pedido|open_cart]
+6. Para enlaces clickeables usa: [button:link|Texto del Enlace|URL]`
+  }
 };
 
 export const ADMIN_PASSWORD_HASH = storeConfig?.adminPasswordHash || "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4";

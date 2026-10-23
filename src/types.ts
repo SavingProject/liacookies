@@ -69,6 +69,39 @@ export interface StoreSettings {
   instagramMode?: boolean;
   instagramDmUrl?: string;
   instagramHandle?: string;
+  aiAgent?: AiAgentConfig;
+}
+
+export type AiProvider = "openrouter" | "openai" | "gemini" | "ollama";
+
+export interface AiAgentConfig {
+  enabled: boolean;
+  provider: AiProvider;
+  
+  // OpenRouter
+  openRouterApiKey?: string;
+  openRouterModel?: string; // Default: "openrouter/free"
+  
+  // OpenAI
+  openAiApiKey?: string;
+  openAiModel?: string; // Default: "gpt-4o-mini"
+  
+  // Gemini
+  geminiApiKey?: string;
+  geminiModel?: string; // Default: "gemini-2.5-flash"
+  
+  // Ollama (Local and Cloud)
+  ollamaBaseUrl?: string; // Default: "https://ollama.com/v1"
+  ollamaApiKey?: string;
+  ollamaModel?: string; // Default: "gemma4:31b-cloud"
+  
+  // Customization
+  botName?: string; // Default: "ChipBot"
+  greetingMessage?: string; // Default: "¡Hola! 🍪 Soy ChipBot. ¿Puedo ayudarte?"
+  animationFrequency?: "normal" | "frequent" | "subtle" | "none";
+  
+  // Master Prompt
+  masterPrompt?: string;
 }
 
 export interface ContactInfo {

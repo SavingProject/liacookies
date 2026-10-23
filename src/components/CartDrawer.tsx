@@ -4,8 +4,9 @@
  */
 
 import { CartItem, MenuItem } from "../types";
-import { X, Trash2, MessageSquare, ShoppingBag, Plus, Minus, FileText, Instagram, Copy, Check, ExternalLink, Sparkles, CheckCircle2, MapPin, Loader2, Navigation } from "lucide-react";
+import { X, Trash2, MessageSquare, ShoppingBag, Plus, Minus, FileText, Instagram, Copy, Check, ExternalLink, Sparkles, CheckCircle2, MapPin, Loader2, Navigation, Phone } from "lucide-react";
 import { useState } from "react";
+import { playCartSendSound } from "../utils/soundEffects";
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -21,33 +22,37 @@ interface CartDrawerProps {
   instagramMode?: boolean;
   instagramDmUrl?: string;
   onNotify?: (message: string) => void;
+  onOrderSent?: (orderSummary: string, channel: "whatsapp" | "instagram") => void;
 }
 
-// Helper to construct Instagram DM link with pre-filled message text (?text=...)
-export const getInstagramDmUrlWithText = (baseDmUrl: string, messageText: string): string => {
-  let rawUrl = (baseDmUrl || "https://ig.me/m/liacookies70").trim();
-
-  // If user only provided handle e.g. "liacookies70" or "@liacookies70"
-  if (!rawUrl.startsWith("http://") && !rawUrl.startsWith("https://")) {
-    const handle = rawUrl.replace(/^@/, "").replace(/^instagram\.com\//, "");
-    rawUrl = `https://ig.me/m/${handle}`;
-  } else if (rawUrl.includes("instagram.com/") && !rawUrl.includes("/direct/")) {
-    // Convert regular profile link https://instagram.com/liacookies70 to https://ig.me/m/liacookies70
-    const parts = rawUrl.replace(/\/$/, "").split("/");
-    const handle = parts[parts.length - 1].replace(/^@/, "");
-    if (handle && handle !== "instagram.com") {
-      rawUrl = `https://ig.me/m/${handle}`;
-    }
+// Robust extractor for clean lowercase Instagram username without @, slashes or parameters
+export const extractInstagramHandle = (urlOrHandle: string): string => {
+  if (!urlOrHandle) return "liacookies70";
+  let clean = urlOrHandle.trim();
+  clean = clean.split("?")[0].split("#")[0];
+  clean = clean.replace(/\/+$/, "");
+  if (clean.includes("/")) {
+    const segments = clean.split("/").filter(Boolean);
+    clean = segments[segments.length - 1] || "liacookies70";
   }
+  return clean.replace(/^@/, "").toLowerCase().trim() || "liacookies70";
+};
 
-  // Strip existing ?text parameter if any
-  const cleanBase = rawUrl.split("?text=")[0].split("&text=")[0];
-  const separator = cleanBase.includes("?") ? "&" : "?";
-  return `${cleanBase}${separator}text=${encodeURIComponent(messageText)}`;
+// Helper to construct Instagram DM link with pre-filled message text (?text=...)
+// Standard format: https://ig.me/m/<username>?text=<encoded_order> (no trailing slash before query)
+export const getInstagramDmUrlWithText = (baseDmUrl: string, messageText: string): string => {
+  const handle = extractInstagramHandle(baseDmUrl);
+  return `https://ig.me/m/${handle}?text=${encodeURIComponent(messageText)}`;
+};
+
+// Helper to construct WhatsApp link with pre-filled message text (?text=...)
+export const getWhatsAppUrlWithText = (phone: string, messageText: string): string => {
+  const cleanPhone = phone ? phone.replace(/[^0-9]/g, "") : "18498140019";
+  return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(messageText)}`;
 };
 
 // Robust clipboard copy with multi-layer fallback for iframes, mobile Safari, iOS and Android
-const copyToClipboardRobust = (text: string): boolean => {
+export const copyToClipboardRobust = (text: string): boolean => {
   let copied = false;
 
   // Layer 1: Synchronous textarea with execCommand (preserves user-gesture context for popups & works in iframes)
@@ -85,6 +90,89 @@ const copyToClipboardRobust = (text: string): boolean => {
   return copied;
 };
 
+export interface OrderSummaryOptions {
+  isForInstagram?: boolean;
+  customerName?: string;
+  deliveryMethod?: "delivery" | "takeout" | "table";
+  address?: string;
+  tableNumber?: string;
+  storeName?: string;
+  storeSubtitle?: string;
+}
+
+export const generateOrderSummaryText = (
+  cart: CartItem[],
+  options?: OrderSummaryOptions
+): string => {
+  const {
+    isForInstagram = false,
+    customerName = "",
+    deliveryMethod = "delivery",
+    address = "",
+    tableNumber = "",
+    storeName = "Lia Cookies",
+    storeSubtitle = "Dulce Experiencia de Sabores",
+  } = options || {};
+
+  const subtotal = cart.reduce((acc, item) => acc + item.item.price * item.quantity, 0);
+
+  if (cart.length === 0) {
+    if (isForInstagram) {
+      return `¡Hola! Me comunico desde la plataforma de ${storeName} 🍪 Me gustaría consultar sobre sus galletas artesanales y realizar un pedido ✨`;
+    }
+    return `🍪 *${storeName.toUpperCase()}* 🍪\n_${storeSubtitle}_\n\n¡Hola! Me gustaría consultar sobre sus galletas artesanales y realizar un pedido ✨🍪`;
+  }
+
+  let itemsText = "";
+  cart.forEach((cartItem) => {
+    const itemNote = cartItem.notes ? (isForInstagram ? `\n   Nota: ${cartItem.notes}` : `\n   _Nota: ${cartItem.notes}_`) : "";
+    const unitLabel = cartItem.item.unit ? ` (${cartItem.item.unit})` : "";
+    if (isForInstagram) {
+      itemsText += `🍪 ${cartItem.quantity}x ${cartItem.item.name}${unitLabel} - RD$ ${(cartItem.item.price * cartItem.quantity).toLocaleString()}${itemNote}\n`;
+    } else {
+      itemsText += `🍪 *${cartItem.quantity}x* ${cartItem.item.name}${unitLabel} - RD$ ${(cartItem.item.price * cartItem.quantity).toLocaleString()}${itemNote}\n`;
+    }
+  });
+
+  const clientNameDisplay = customerName.trim() || "Cliente";
+  const addressClean = address.trim();
+
+  let deliveryLabel = "";
+  if (deliveryMethod === "delivery") {
+    if (addressClean) {
+      deliveryLabel = isForInstagram
+        ? `🚚 Para Envío (Delivery)\n📍 Dirección: ${addressClean}`
+        : `🚚 *Para Envío (Delivery)*\n📍 *Dirección:* ${addressClean}`;
+    } else {
+      deliveryLabel = isForInstagram
+        ? `🚚 Para Envío (Delivery)`
+        : `🚚 *Para Envío (Delivery)*`;
+    }
+  } else if (deliveryMethod === "takeout") {
+    deliveryLabel = isForInstagram
+      ? `🎒 Para Retirar (Takeout)`
+      : `🎒 *Para Retirar (Takeout)*`;
+  } else {
+    deliveryLabel = isForInstagram
+      ? `🍽️ Consumo en el Local\n📌 Mesa: ${tableNumber.trim() || "No especificada"}`
+      : `🍽️ *Consumo en el Local*\n📌 *Mesa:* ${tableNumber.trim() || "No especificada"}`;
+  }
+
+  if (isForInstagram) {
+    return `¡Hola! Me gustaría realizar el siguiente pedido en ${storeName}:\n\n` +
+      `👤 CLIENTE: ${clientNameDisplay}\n` +
+      `${deliveryLabel}\n\n` +
+      `🛒 DETALLE DEL PEDIDO:\n` +
+      `---------------------------\n` +
+      `${itemsText}` +
+      `---------------------------\n` +
+      `💰 TOTAL: RD$ ${subtotal.toLocaleString()}\n\n` +
+      `¡Muchas gracias! ✨🍪`;
+  }
+
+  return `🍪 *${storeName.toUpperCase()}* 🍪\n_${storeSubtitle}_\n\n📱 *CLIENTE:* ${clientNameDisplay}\n${deliveryLabel}\n\n🛒 *DETALLE DEL PEDIDO:*\n===========================\n${itemsText}===========================\n*TOTAL:* RD$ ${subtotal.toLocaleString()}\n\nMuchas gracias ✨🍪✨`;
+};
+
 export default function CartDrawer({
   isOpen,
   onClose,
@@ -99,6 +187,7 @@ export default function CartDrawer({
   instagramMode = true,
   instagramDmUrl = "https://ig.me/m/liacookies70",
   onNotify,
+  onOrderSent,
 }: CartDrawerProps) {
   const [customerName, setCustomerName] = useState("");
   const [deliveryMethod, setDeliveryMethod] = useState<"delivery" | "takeout" | "table">("delivery");
@@ -107,7 +196,7 @@ export default function CartDrawer({
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [errors, setErrors] = useState<{ customerName?: boolean; address?: boolean }>({});
   const [isCopied, setIsCopied] = useState(false);
-  const [showInstagramSuccessModal, setShowInstagramSuccessModal] = useState(false);
+  const [sentSuccessModal, setSentSuccessModal] = useState<{ channel: "whatsapp" | "instagram"; orderText: string } | null>(null);
   const [copiedOrderText, setCopiedOrderText] = useState("");
 
   const handleGetLocation = () => {
@@ -238,46 +327,32 @@ export default function CartDrawer({
     return DESSERT_COOKIE_EMOJIS[Math.floor(Math.random() * DESSERT_COOKIE_EMOJIS.length)];
   };
 
-  const generateOrderSummary = () => {
-    let itemsText = "";
-    cart.forEach((cartItem) => {
-      const itemNote = cartItem.notes ? `\n   _Nota: ${cartItem.notes}_` : "";
-      const unitLabel = cartItem.item.unit ? ` (${cartItem.item.unit})` : "";
-      const sweetBullet = getRandomSweetEmoji();
-      itemsText += `${sweetBullet} *${cartItem.quantity}x* ${cartItem.item.name}${unitLabel} - RD$ ${(cartItem.item.price * cartItem.quantity).toLocaleString()}${itemNote}\n`;
+  const generateOrderSummary = (isForInstagram = false) => {
+    return generateOrderSummaryText(cart, {
+      isForInstagram,
+      customerName,
+      deliveryMethod,
+      address,
+      tableNumber,
+      storeName,
+      storeSubtitle,
     });
-
-    const deliveryLabel =
-      deliveryMethod === "delivery"
-        ? `🚚 *Para Envío (Delivery)*\n📍 *Dirección:* ${address}`
-        : deliveryMethod === "takeout"
-        ? `🎒 *Para Retirar (Takeout)*`
-        : `🍽️ *Consumo en el Local*\n📌 *Mesa:* ${tableNumber || "No especificada"}`;
-
-    const sweetLeft = getRandomSweetEmoji();
-    const sweetRight = getRandomSweetEmoji();
-    const sweetFooter1 = getRandomSweetEmoji();
-    const sweetFooter2 = getRandomSweetEmoji();
-
-    return `${sweetLeft} *${storeName.toUpperCase()}* ${sweetRight}\n_${storeSubtitle}_\n\n📱 *CLIENTE:* ${customerName}\n${deliveryLabel}\n\n🛒 *DETALLE DEL PEDIDO:*\n===========================\n${itemsText}===========================\n*TOTAL:* RD$ ${subtotal.toLocaleString()}\n\nMuchas gracias ✨${sweetFooter1}${sweetFooter2}`;
   };
 
   const handleSendOrder = () => {
     if (cart.length === 0) return;
 
     const newErrors: { customerName?: boolean; address?: boolean } = {};
+    // Name is strictly mandatory
     if (!customerName.trim()) {
       newErrors.customerName = true;
     }
-    if (deliveryMethod === "delivery" && !address.trim()) {
-      newErrors.address = true;
-    }
+    // Location is NO LONGER mandatory in the cart, it is optional
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      // Automatically scroll to first error if possible
-      const errField = newErrors.customerName ? "cart-customer-name-field" : "cart-address-field";
-      const el = document.getElementById(errField);
+      // Automatically scroll to customer name error field
+      const el = document.getElementById("cart-customer-name-field");
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
         el.focus();
@@ -285,55 +360,43 @@ export default function CartDrawer({
       return;
     }
 
-    const formattedMessage = generateOrderSummary();
+    const channel = instagramMode ? "instagram" : "whatsapp";
+    const formattedMessage = generateOrderSummary(instagramMode);
 
-    if (instagramMode) {
-      // 1. Copy order summary to clipboard synchronously
-      copyToClipboardRobust(formattedMessage);
-      setCopiedOrderText(formattedMessage);
-      setIsCopied(true);
+    // Play pleasant confirmation sound when clicking Confirmar
+    playCartSendSound();
 
-      if (onNotify) {
-        onNotify("📋 ¡Pedido listo! Abriendo chat de Instagram...");
-      }
+    // 1. Copy complete order text to clipboard
+    copyToClipboardRobust(formattedMessage);
+    setCopiedOrderText(formattedMessage);
+    setIsCopied(true);
 
-      // 2. Open Instagram DM URL with prefilled text parameter (?text=...)
-      const dmLink = getInstagramDmUrlWithText(instagramDmUrl || "https://ig.me/m/liacookies70", formattedMessage);
-      
-      const isMobile = /iPhone|iPad|iPod|Android|Mobile|Tablet/i.test(navigator.userAgent) || 
-        (typeof navigator.maxTouchPoints === "number" && navigator.maxTouchPoints > 2);
-      
-      if (isMobile) {
-        // Direct navigation so mobile OS smoothly delegates to native Instagram app
-        window.location.href = dmLink;
-      } else {
-        window.open(dmLink, "_blank");
-      }
-
-      // 3. Show confirmation modal with full details
-      setShowInstagramSuccessModal(true);
-    } else {
-      // Standard WhatsApp flow
-      const encodedMessage = encodeURIComponent(formattedMessage);
-      const whatsappUrl = `https://wa.me/${whatsappPhone}?text=${encodedMessage}`;
-      window.open(whatsappUrl, "_blank");
-      onClearCart();
-      onClose();
+    // 2. Notify parent / ChipBot that an order has been registered
+    if (onOrderSent) {
+      onOrderSent(formattedMessage, channel);
     }
+
+    // 3. Inform user that order information is copied
+    if (onNotify) {
+      onNotify("📋 ¡Tu pedido completo ya ha sido copiado! Ahora solo pulsa el botón para pedir.");
+    }
+
+    // 4. Smoothly transition to the "Pedido Copiado y Listo" screen
+    setSentSuccessModal({ channel, orderText: formattedMessage });
   };
 
   const handleManualReCopy = () => {
-    const textToCopy = copiedOrderText || generateOrderSummary();
+    const textToCopy = copiedOrderText || generateOrderSummary(instagramMode);
     copyToClipboardRobust(textToCopy);
     setIsCopied(true);
     if (onNotify) {
-      onNotify("✅ ¡Texto copiado de nuevo al portapapeles!");
+      onNotify("✅ ¡Pedido completo copiado de nuevo al portapapeles!");
     }
     setTimeout(() => setIsCopied(false), 2500);
   };
 
-  const handleFinishInstagramOrder = () => {
-    setShowInstagramSuccessModal(false);
+  const handleFinishOrder = () => {
+    setSentSuccessModal(null);
     onClearCart();
     onClose();
   };
@@ -560,34 +623,22 @@ export default function CartDrawer({
                               </>
                             )}
                           </button>
-                          <span className="text-[10px] text-primary font-bold px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20">
-                            Obligatorio
+                          <span className="text-[10px] text-gray-400 font-medium px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
+                            Opcional
                           </span>
                         </div>
                       </div>
                       <textarea
                         id="cart-address-field"
                         rows={2}
-                        className={`w-full bg-black/45 border rounded-xl px-4 py-3 text-sm font-sans text-white focus:outline-none transition-all resize-none ${
-                          errors.address
-                            ? "border-red-500 ring-2 ring-red-500/20 focus:border-red-500"
-                            : "border-primary/40 focus:border-primary focus:ring-1 focus:ring-primary shadow-inner"
-                        }`}
-                        placeholder="Calle, Número, Sector o pulsa 'Ubicación' para GPS..."
+                        className="w-full bg-black/45 border border-primary/40 focus:border-primary focus:ring-1 focus:ring-primary shadow-inner rounded-xl px-4 py-3 text-sm font-sans text-white focus:outline-none transition-all resize-none placeholder-gray-500"
+                        placeholder="Opcional: Calle, Número, Sector o pulsa 'Ubicación' para GPS..."
                         value={address}
                         onChange={(e) => {
                           const val = e.target.value;
                           setAddress(val);
-                          if (errors.address && val.trim()) {
-                            setErrors((prev) => ({ ...prev, address: false }));
-                          }
                         }}
                       ></textarea>
-                      {errors.address && (
-                        <p className="text-[11px] text-red-400 font-semibold animate-pulse mt-0.5 flex items-center gap-1">
-                          ⚠️ Por favor, ingresa la dirección para enviar tu pedido.
-                        </p>
-                      )}
                     </div>
                   )}
 
@@ -640,31 +691,18 @@ export default function CartDrawer({
               {instagramMode && (
                 <div className="bg-pink-500/10 border border-pink-500/20 rounded-xl p-2.5 text-[11px] text-pink-200 flex items-center gap-2">
                   <Instagram className="w-4 h-4 text-pink-400 shrink-0" />
-                  <span>Tu pedido se copiará automáticamente y se abrirá el chat de Instagram para enviarlo.</span>
+                  <span>Tu pedido se abrirá pre-rellenado en Instagram DM, listo para presionar <strong>Enviar</strong>.</span>
                 </div>
               )}
 
               <button
                 id="cart-submit-btn"
                 onClick={handleSendOrder}
-                className={`w-full py-4 rounded-2xl font-display font-bold text-white hover:opacity-95 selection:bg-none transform transition-all duration-300 flex items-center justify-center gap-2 shadow-lg scale-100 hover:scale-[1.02] active:scale-[0.98] cursor-pointer ${
-                  instagramMode
-                    ? "bg-gradient-to-r from-purple-600 via-pink-600 to-rose-500 shadow-pink-500/25"
-                    : "bg-primary shadow-primary/20"
-                }`}
+                className="w-full py-4 rounded-2xl font-display font-bold text-white hover:opacity-95 selection:bg-none transform transition-all duration-300 flex items-center justify-center gap-2 shadow-lg scale-100 hover:scale-[1.02] active:scale-[0.98] cursor-pointer bg-gradient-to-r from-purple-600 via-pink-600 to-rose-500 shadow-pink-500/25"
                 style={!instagramMode ? { backgroundColor: "var(--color-primary, #8A1C9E)" } : {}}
               >
-                {instagramMode ? (
-                  <>
-                    {isCopied ? <Check className="w-5 h-5 text-white" /> : <Instagram className="w-5 h-5 text-white" />}
-                    <span>{isCopied ? "¡Pedido Copiado! Abriendo..." : "Pedir por Instagram DM"}</span>
-                  </>
-                ) : (
-                  <>
-                    <MessageSquare className="w-5 h-5 fill-white text-primary" />
-                    <span>Pedir por WhatsApp</span>
-                  </>
-                )}
+                <Check className="w-5 h-5 text-white" />
+                <span className="text-base tracking-wide">Confirmar</span>
               </button>
               
               <p className="text-[10px] text-gray-500 text-center uppercase tracking-widest font-display">
@@ -673,16 +711,26 @@ export default function CartDrawer({
             </div>
           )}
 
-          {/* Instagram Order Guidance Modal Overlay */}
-          {showInstagramSuccessModal && (
+          {/* Order Sent & Copy Confirmation Guidance Modal Overlay */}
+          {sentSuccessModal && (
             <div className="absolute inset-0 z-50 bg-black/90 backdrop-blur-xl flex flex-col p-6 animate-fadeIn justify-between">
               <div className="space-y-4 overflow-y-auto">
                 <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 via-pink-600 to-rose-500 flex items-center justify-center text-white shadow-lg shadow-pink-500/30">
-                    <Instagram className="w-6 h-6 text-white" />
+                  <div
+                    className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg ${
+                      sentSuccessModal.channel === "instagram"
+                        ? "bg-gradient-to-tr from-purple-600 via-pink-600 to-rose-500 shadow-pink-500/30"
+                        : "bg-gradient-to-tr from-emerald-600 to-teal-500 shadow-emerald-500/30"
+                    }`}
+                  >
+                    {sentSuccessModal.channel === "instagram" ? (
+                      <Instagram className="w-6 h-6 text-white" />
+                    ) : (
+                      <Phone className="w-6 h-6 text-white" />
+                    )}
                   </div>
                   <button
-                    onClick={() => setShowInstagramSuccessModal(false)}
+                    onClick={() => setSentSuccessModal(null)}
                     className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-gray-300 flex items-center justify-center transition-colors cursor-pointer"
                   >
                     <X className="w-4 h-4" />
@@ -692,85 +740,113 @@ export default function CartDrawer({
                 <div className="space-y-1">
                   <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-xs uppercase tracking-wider">
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>¡Copiado con Éxito!</span>
+                    <span>¡Pedido Copiado y Listo!</span>
                   </div>
                   <h3 className="text-xl font-display font-black text-white">
-                    Pega tu pedido en Instagram DM
+                    {sentSuccessModal.channel === "instagram"
+                      ? "¡Listo para Enviar en Instagram DM!"
+                      : "¡Listo para Enviar en WhatsApp!"}
                   </h3>
                   <p className="text-xs text-gray-300 leading-relaxed font-light">
-                    El detalle de tu pedido ya está guardado en tu portapapeles. Sigue estos 2 sencillos pasos:
+                    Hemos abierto la aplicación con tu pedido. Además, toda la información de tu orden ya fue{" "}
+                    <strong className="text-white font-semibold underline underline-offset-2">copiada al portapapeles</strong>.
                   </p>
                 </div>
 
                 {/* Step-by-step visual instruction */}
-                <div className="space-y-2 bg-white/5 border border-pink-500/20 rounded-2xl p-3.5 text-xs text-gray-200">
+                <div className="space-y-2.5 bg-white/5 border border-white/10 rounded-2xl p-4 text-xs text-gray-200">
                   <div className="flex items-start gap-2.5">
-                    <span className="w-5 h-5 rounded-full bg-pink-500/20 text-pink-300 font-bold text-[10px] flex items-center justify-center shrink-0 border border-pink-500/30">
+                    <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[10px] flex items-center justify-center shrink-0 border border-emerald-500/30">
                       1
                     </span>
-                    <p className="text-[11px] leading-snug">
-                      Entra al chat directo de Instagram <strong className="text-pink-300">@liacookies70</strong>.
+                    <p className="text-[12px] leading-snug">
+                      La información completa de tu pedido ya está copiada.
                     </p>
                   </div>
                   <div className="flex items-start gap-2.5">
-                    <span className="w-5 h-5 rounded-full bg-pink-500/20 text-pink-300 font-bold text-[10px] flex items-center justify-center shrink-0 border border-pink-500/30">
+                    <span className="w-5 h-5 rounded-full bg-primary/20 text-primary font-bold text-[10px] flex items-center justify-center shrink-0 border border-primary/30">
                       2
                     </span>
-                    <p className="text-[11px] leading-snug">
-                      Mantén presionado el campo de escribir mensaje y selecciona <strong className="text-white underline underline-offset-2">Pegar (Paste)</strong>.
-                    </p>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <span className="w-5 h-5 rounded-full bg-pink-500/20 text-pink-300 font-bold text-[10px] flex items-center justify-center shrink-0 border border-pink-500/30">
-                      3
-                    </span>
-                    <p className="text-[11px] leading-snug">
-                      Presiona <strong className="text-emerald-300">Enviar</strong> y listo. ¡Te responderemos de inmediato!
+                    <p className="text-[12px] leading-snug">
+                      <strong className="text-amber-300">¿No se visualiza el texto?</strong> Solo mantén presionado el campo de chat y pulsa <strong className="text-white underline">Pegar</strong>.
                     </p>
                   </div>
                 </div>
 
-                {/* Order Preview Box with re-copy button */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Texto de tu Pedido:</span>
-                    <button
-                      type="button"
-                      onClick={handleManualReCopy}
-                      className="text-[11px] font-bold text-pink-300 hover:text-pink-200 flex items-center gap-1 cursor-pointer bg-pink-500/10 hover:bg-pink-500/20 px-2.5 py-1 rounded-lg border border-pink-500/30 transition-all"
-                    >
-                      <Copy className="w-3 h-3" />
-                      <span>{isCopied ? "¡Copiado de nuevo!" : "Copiar otra vez"}</span>
-                    </button>
+                {/* Discreet backup preview */}
+                <details className="group bg-black/40 border border-white/10 rounded-xl p-3 text-xs">
+                  <summary className="flex items-center justify-between cursor-pointer list-none text-gray-400 group-hover:text-gray-200 select-none">
+                    <span className="text-[11px] font-semibold flex items-center gap-1.5">
+                      <Sparkles className="w-3 h-3 text-pink-400" />
+                      Ver texto completo del pedido copiado
+                    </span>
+                    <span className="text-[10px] text-pink-300 underline underline-offset-2">Ver / Copiar</span>
+                  </summary>
+                  <div className="mt-3 pt-3 border-t border-white/5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-gray-400 uppercase font-mono">Respaldo copiado</span>
+                      <button
+                        type="button"
+                        onClick={handleManualReCopy}
+                        className="text-[10px] font-bold text-pink-300 hover:text-pink-200 flex items-center gap-1 cursor-pointer bg-pink-500/10 px-2 py-0.5 rounded border border-pink-500/20"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>{isCopied ? "¡Copiado!" : "Copiar de nuevo"}</span>
+                      </button>
+                    </div>
+                    <div className="bg-black/60 rounded-lg p-2.5 max-h-24 overflow-y-auto font-mono text-[10px] text-gray-300 whitespace-pre-wrap leading-relaxed border border-white/5">
+                      {copiedOrderText || sentSuccessModal.orderText}
+                    </div>
                   </div>
-                  <div className="bg-black/60 border border-white/10 rounded-xl p-3 max-h-28 overflow-y-auto font-mono text-[11px] text-gray-300 whitespace-pre-wrap leading-relaxed">
-                    {copiedOrderText || generateOrderSummary()}
-                  </div>
-                </div>
+                </details>
               </div>
 
               {/* Action Buttons */}
               <div className="pt-4 space-y-2">
-                <a
-                  href={getInstagramDmUrlWithText(
-                    instagramDmUrl || "https://ig.me/m/liacookies70",
-                    copiedOrderText || generateOrderSummary()
-                  )}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="w-full py-3.5 rounded-xl font-display font-bold text-white bg-gradient-to-r from-purple-600 via-pink-600 to-rose-500 hover:opacity-95 flex items-center justify-center gap-2 shadow-lg shadow-pink-500/30 transition-all cursor-pointer"
-                >
-                  <Instagram className="w-4 h-4" />
-                  <span>Abrir Chat de Instagram DM</span>
-                  <ExternalLink className="w-3.5 h-3.5 opacity-70" />
-                </a>
+                {sentSuccessModal.channel === "instagram" ? (
+                  <a
+                    href={getInstagramDmUrlWithText(
+                      instagramDmUrl || "https://ig.me/m/liacookies70",
+                      copiedOrderText || sentSuccessModal.orderText
+                    )}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => {
+                      playCartSendSound();
+                      copyToClipboardRobust(copiedOrderText || sentSuccessModal.orderText);
+                    }}
+                    className="w-full py-3.5 rounded-xl font-display font-bold text-white bg-gradient-to-r from-purple-600 via-pink-600 to-rose-500 hover:opacity-95 flex items-center justify-center gap-2 shadow-lg shadow-pink-500/30 transition-all cursor-pointer"
+                  >
+                    <Instagram className="w-4 h-4" />
+                    <span>Pedir en Instagram</span>
+                    <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+                  </a>
+                ) : (
+                  <a
+                    href={getWhatsAppUrlWithText(
+                      whatsappPhone ? whatsappPhone.replace(/[^0-9]/g, "") : "18498140019",
+                      copiedOrderText || sentSuccessModal.orderText
+                    )}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => {
+                      playCartSendSound();
+                      copyToClipboardRobust(copiedOrderText || sentSuccessModal.orderText);
+                    }}
+                    className="w-full py-3.5 rounded-xl font-display font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-95 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30 transition-all cursor-pointer"
+                  >
+                    <Phone className="w-4 h-4" />
+                    <span>Pedir por WhatsApp</span>
+                    <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+                  </a>
+                )}
 
                 <button
                   type="button"
-                  onClick={handleFinishInstagramOrder}
+                  onClick={handleFinishOrder}
                   className="w-full py-2.5 rounded-xl font-sans text-xs font-semibold text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/5 transition-all cursor-pointer"
                 >
-                  Ya lo pegué y envié • Cerrar y Limpiar Carrito
+                  Listo, ya envié mi pedido • Limpiar Carrito
                 </button>
               </div>
             </div>
